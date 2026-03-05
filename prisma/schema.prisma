@@ -1,0 +1,183 @@
+generator client {
+  provider = "prisma-client"
+  output = "./client"
+  previewFeatures = ["relationJoins"]
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Attachment {
+  id        String   @id
+  messageId String
+  filename  String
+  url       String
+  fileType  String
+  fileSize  Int
+  createdAt DateTime @default(now())
+  Message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([messageId])
+}
+
+model Conversation {
+  id                      String                    @id
+  name                    String?
+  avatar                  String?
+  isGroup                 Boolean                   @default(false)
+  createdBy               String?
+  createdAt               DateTime                  @default(now())
+  updatedAt               DateTime
+  lastMessageAt           DateTime?
+  ConversationParticipant ConversationParticipant[]
+  Message                 Message[]
+}
+
+model ConversationParticipant {
+  id             String          @id
+  conversationId String
+  userId         String
+  joinedAt       DateTime        @default(now())
+  leftAt         DateTime?
+  role           ParticipantRole @default(MEMBER)
+  lastReadAt     DateTime?
+  Conversation   Conversation    @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  User           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, userId])
+  @@index([conversationId])
+  @@index([userId])
+}
+
+model FriendRequest {
+  id                                  String       @id
+  senderId                            String
+  receiverId                          String
+  status                              FriendStatus @default(pending)
+  createdAt                           DateTime     @default(now())
+  updatedAt                           DateTime
+  User_FriendRequest_receiverIdToUser User         @relation("FriendRequest_receiverIdToUser", fields: [receiverId], references: [id])
+  User_FriendRequest_senderIdToUser   User         @relation("FriendRequest_senderIdToUser", fields: [senderId], references: [id])
+}
+
+model Message {
+  id             String        @id
+  conversationId String
+  senderId       String
+  content        String?
+  type           MessageType   @default(TEXT)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime
+  isEdited       Boolean       @default(false)
+  deletedAt      DateTime?
+  replyToId      String?
+  isPinned       Boolean       @default(false)
+  pinnedAt       DateTime?
+  pinnedBy       String?
+  Attachment     Attachment[]
+  Conversation   Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  Message        Message?      @relation("MessageToMessage", fields: [replyToId], references: [id])
+  other_Message  Message[]     @relation("MessageToMessage")
+  User           User          @relation(fields: [senderId], references: [id])
+  Reaction       Reaction[]
+  ReadReceipt    ReadReceipt[]
+
+  @@index([conversationId])
+  @@index([createdAt])
+  @@index([isPinned])
+  @@index([senderId])
+}
+
+model PasswordReset {
+  id        String   @id
+  email     String
+  otp       String
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  isUsed    Boolean  @default(false)
+
+  @@index([email])
+}
+
+model Reaction {
+  id        String   @id
+  messageId String
+  userId    String
+  emoji     String
+  createdAt DateTime @default(now())
+  Message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  User      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId, emoji])
+  @@index([messageId])
+}
+
+model ReadReceipt {
+  id        String   @id
+  messageId String
+  userId    String
+  readAt    DateTime @default(now())
+  Message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  User      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId])
+  @@index([messageId])
+  @@index([userId])
+}
+
+model TokenBlacklist {
+  id        Int      @id @default(autoincrement())
+  token     String   @unique
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+}
+
+model User {
+  id                                           String                    @id
+  email                                        String                    @unique
+  password                                     String?
+  fullName                                     String?
+  avatar                                       String?
+  createdAt                                    DateTime                  @default(now())
+  updatedAt                                    DateTime
+  role                                         String                    @default("USER")
+  googleId                                     String?                   @unique
+  typeAuth                                     authProvider              @default(EMAIL)
+  bio                                          String?
+  isOnline                                     Boolean                   @default(false)
+  lastSeen                                     DateTime?
+  ConversationParticipant                      ConversationParticipant[]
+  FriendRequest_FriendRequest_receiverIdToUser FriendRequest[]           @relation("FriendRequest_receiverIdToUser")
+  FriendRequest_FriendRequest_senderIdToUser   FriendRequest[]           @relation("FriendRequest_senderIdToUser")
+  Message                                      Message[]
+  Reaction                                     Reaction[]
+  ReadReceipt                                  ReadReceipt[]
+}
+
+enum FriendStatus {
+  pending
+  accepted
+  rejected
+  blocked
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  VIDEO
+  AUDIO
+  FILE
+  SYSTEM
+}
+
+enum ParticipantRole {
+  ADMIN
+  MEMBER
+}
+
+enum authProvider {
+  EMAIL
+  GOOGLE
+}

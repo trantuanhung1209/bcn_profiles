@@ -1,10 +1,14 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { UsersService } from './users.service';
 import type { SortableUserFields, SortOrder } from './users.service';
 import { QueryUsersDto } from './dto/query-users.dto';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { Role } from '../auth/enums/role.enum';
+import { User } from '../auth/decorators/user.decorator';
 @Controller('users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
@@ -46,6 +50,7 @@ export class UsersController {
   }
 
   @Get(':id')
+  @Roles(Role.ADMIN)
   async findOne(@Param('id') id: string) {
     const user = await this.usersService.findOne(id);
     return {
@@ -54,6 +59,7 @@ export class UsersController {
   }
 
   @Post()
+  @Roles(Role.ADMIN)
   async createUser(@Body() userData: CreateUserDto) {
     const newUser = await this.usersService.createUser(userData);
     return {
@@ -62,6 +68,7 @@ export class UsersController {
   }
 
   @Delete(':id')
+  @Roles(Role.ADMIN)
   async deleteUser(@Param('id') id: string) {
     await this.usersService.deleteUser(id);
     return {
@@ -70,10 +77,19 @@ export class UsersController {
   }
 
   @Patch(':id')
+  @Roles(Role.USER)
   async updateUser(@Param('id') id: string, @Body() updateData: UpdateUserDto) {
     const updatedUser = await this.usersService.updateUser(id, updateData);
     return {
       users: updatedUser,
+    };
+  }
+
+  // Ví dụ: Route cho user xem thông tin của chính họ
+  @Get('me/profile')
+  async getMyProfile(@User() user: any) {
+    return {
+      user: user,
     };
   }
 }

@@ -16,7 +16,7 @@ import { RolesGuard } from './auth/guards/roles.guard';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: '.env',
+      envFilePath: process.env.NODE_ENV === 'production' ? '.env.production' : '.env',
     }),
     ScheduleModule.forRoot(), // Enable scheduled tasks
     CatsModule,

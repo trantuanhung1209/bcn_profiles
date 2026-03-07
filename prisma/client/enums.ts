@@ -9,36 +9,6 @@
 * 🟢 You can import this file directly.
 */
 
-export const FriendStatus = {
-  pending: 'pending',
-  accepted: 'accepted',
-  rejected: 'rejected',
-  blocked: 'blocked'
-} as const
-
-export type FriendStatus = (typeof FriendStatus)[keyof typeof FriendStatus]
-
-
-export const MessageType = {
-  TEXT: 'TEXT',
-  IMAGE: 'IMAGE',
-  VIDEO: 'VIDEO',
-  AUDIO: 'AUDIO',
-  FILE: 'FILE',
-  SYSTEM: 'SYSTEM'
-} as const
-
-export type MessageType = (typeof MessageType)[keyof typeof MessageType]
-
-
-export const ParticipantRole = {
-  ADMIN: 'ADMIN',
-  MEMBER: 'MEMBER'
-} as const
-
-export type ParticipantRole = (typeof ParticipantRole)[keyof typeof ParticipantRole]
-
-
 export const authProvider = {
   EMAIL: 'EMAIL',
   GOOGLE: 'GOOGLE'

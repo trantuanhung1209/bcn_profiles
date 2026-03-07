@@ -18,45 +18,10 @@ export { Prisma }
 export * as $Enums from './enums.js'
 export * from './enums.js';
 /**
- * Model Attachment
- * 
- */
-export type Attachment = Prisma.AttachmentModel
-/**
- * Model Conversation
- * 
- */
-export type Conversation = Prisma.ConversationModel
-/**
- * Model ConversationParticipant
- * 
- */
-export type ConversationParticipant = Prisma.ConversationParticipantModel
-/**
- * Model FriendRequest
- * 
- */
-export type FriendRequest = Prisma.FriendRequestModel
-/**
- * Model Message
- * 
- */
-export type Message = Prisma.MessageModel
-/**
  * Model PasswordReset
  * 
  */
 export type PasswordReset = Prisma.PasswordResetModel
-/**
- * Model Reaction
- * 
- */
-export type Reaction = Prisma.ReactionModel
-/**
- * Model ReadReceipt
- * 
- */
-export type ReadReceipt = Prisma.ReadReceiptModel
 /**
  * Model TokenBlacklist
  * 

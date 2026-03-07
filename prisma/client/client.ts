@@ -29,8 +29,8 @@ export * from "./enums.js"
  * const prisma = new PrismaClient({
  *   adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL })
  * })
- * // Fetch zero or more Attachments
- * const attachments = await prisma.attachment.findMany()
+ * // Fetch zero or more PasswordResets
+ * const passwordResets = await prisma.passwordReset.findMany()
  * ```
  * 
  * Read more in our [docs](https://pris.ly/d/client).
@@ -40,45 +40,10 @@ export type PrismaClient<LogOpts extends Prisma.LogLevel = never, OmitOpts exten
 export { Prisma }
 
 /**
- * Model Attachment
- * 
- */
-export type Attachment = Prisma.AttachmentModel
-/**
- * Model Conversation
- * 
- */
-export type Conversation = Prisma.ConversationModel
-/**
- * Model ConversationParticipant
- * 
- */
-export type ConversationParticipant = Prisma.ConversationParticipantModel
-/**
- * Model FriendRequest
- * 
- */
-export type FriendRequest = Prisma.FriendRequestModel
-/**
- * Model Message
- * 
- */
-export type Message = Prisma.MessageModel
-/**
  * Model PasswordReset
  * 
  */
 export type PasswordReset = Prisma.PasswordResetModel
-/**
- * Model Reaction
- * 
- */
-export type Reaction = Prisma.ReactionModel
-/**
- * Model ReadReceipt
- * 
- */
-export type ReadReceipt = Prisma.ReadReceiptModel
 /**
  * Model TokenBlacklist
  * 

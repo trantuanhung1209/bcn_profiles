@@ -246,12 +246,6 @@ export type UserWhereInput = {
   bio?: Prisma.StringNullableFilter<"User"> | string | null
   isOnline?: Prisma.BoolFilter<"User"> | boolean
   lastSeen?: Prisma.DateTimeNullableFilter<"User"> | Date | string | null
-  ConversationParticipant?: Prisma.ConversationParticipantListRelationFilter
-  FriendRequest_FriendRequest_receiverIdToUser?: Prisma.FriendRequestListRelationFilter
-  FriendRequest_FriendRequest_senderIdToUser?: Prisma.FriendRequestListRelationFilter
-  Message?: Prisma.MessageListRelationFilter
-  Reaction?: Prisma.ReactionListRelationFilter
-  ReadReceipt?: Prisma.ReadReceiptListRelationFilter
 }
 
 export type UserOrderByWithRelationInput = {
@@ -268,12 +262,6 @@ export type UserOrderByWithRelationInput = {
   bio?: Prisma.SortOrderInput | Prisma.SortOrder
   isOnline?: Prisma.SortOrder
   lastSeen?: Prisma.SortOrderInput | Prisma.SortOrder
-  ConversationParticipant?: Prisma.ConversationParticipantOrderByRelationAggregateInput
-  FriendRequest_FriendRequest_receiverIdToUser?: Prisma.FriendRequestOrderByRelationAggregateInput
-  FriendRequest_FriendRequest_senderIdToUser?: Prisma.FriendRequestOrderByRelationAggregateInput
-  Message?: Prisma.MessageOrderByRelationAggregateInput
-  Reaction?: Prisma.ReactionOrderByRelationAggregateInput
-  ReadReceipt?: Prisma.ReadReceiptOrderByRelationAggregateInput
 }
 
 export type UserWhereUniqueInput = Prisma.AtLeast<{
@@ -293,12 +281,6 @@ export type UserWhereUniqueInput = Prisma.AtLeast<{
   bio?: Prisma.StringNullableFilter<"User"> | string | null
   isOnline?: Prisma.BoolFilter<"User"> | boolean
   lastSeen?: Prisma.DateTimeNullableFilter<"User"> | Date | string | null
-  ConversationParticipant?: Prisma.ConversationParticipantListRelationFilter
-  FriendRequest_FriendRequest_receiverIdToUser?: Prisma.FriendRequestListRelationFilter
-  FriendRequest_FriendRequest_senderIdToUser?: Prisma.FriendRequestListRelationFilter
-  Message?: Prisma.MessageListRelationFilter
-  Reaction?: Prisma.ReactionListRelationFilter
-  ReadReceipt?: Prisma.ReadReceiptListRelationFilter
 }, "id" | "email" | "googleId">
 
 export type UserOrderByWithAggregationInput = {
@@ -353,12 +335,6 @@ export type UserCreateInput = {
   bio?: string | null
   isOnline?: boolean
   lastSeen?: Date | string | null
-  ConversationParticipant?: Prisma.ConversationParticipantCreateNestedManyWithoutUserInput
-  FriendRequest_FriendRequest_receiverIdToUser?: Prisma.FriendRequestCreateNestedManyWithoutUser_FriendRequest_receiverIdToUserInput
-  FriendRequest_FriendRequest_senderIdToUser?: Prisma.FriendRequestCreateNestedManyWithoutUser_FriendRequest_senderIdToUserInput
-  Message?: Prisma.MessageCreateNestedManyWithoutUserInput
-  Reaction?: Prisma.ReactionCreateNestedManyWithoutUserInput
-  ReadReceipt?: Prisma.ReadReceiptCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateInput = {
@@ -375,12 +351,6 @@ export type UserUncheckedCreateInput = {
   bio?: string | null
   isOnline?: boolean
   lastSeen?: Date | string | null
-  ConversationParticipant?: Prisma.ConversationParticipantUncheckedCreateNestedManyWithoutUserInput
-  FriendRequest_FriendRequest_receiverIdToUser?: Prisma.FriendRequestUncheckedCreateNestedManyWithoutUser_FriendRequest_receiverIdToUserInput
-  FriendRequest_FriendRequest_senderIdToUser?: Prisma.FriendRequestUncheckedCreateNestedManyWithoutUser_FriendRequest_senderIdToUserInput
-  Message?: Prisma.MessageUncheckedCreateNestedManyWithoutUserInput
-  Reaction?: Prisma.ReactionUncheckedCreateNestedManyWithoutUserInput
-  ReadReceipt?: Prisma.ReadReceiptUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserUpdateInput = {
@@ -397,12 +367,6 @@ export type UserUpdateInput = {
   bio?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   isOnline?: Prisma.BoolFieldUpdateOperationsInput | boolean
   lastSeen?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  ConversationParticipant?: Prisma.ConversationParticipantUpdateManyWithoutUserNestedInput
-  FriendRequest_FriendRequest_receiverIdToUser?: Prisma.FriendRequestUpdateManyWithoutUser_FriendRequest_receiverIdToUserNestedInput
-  FriendRequest_FriendRequest_senderIdToUser?: Prisma.FriendRequestUpdateManyWithoutUser_FriendRequest_senderIdToUserNestedInput
-  Message?: Prisma.MessageUpdateManyWithoutUserNestedInput
-  Reaction?: Prisma.ReactionUpdateManyWithoutUserNestedInput
-  ReadReceipt?: Prisma.ReadReceiptUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateInput = {
@@ -419,12 +383,6 @@ export type UserUncheckedUpdateInput = {
   bio?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   isOnline?: Prisma.BoolFieldUpdateOperationsInput | boolean
   lastSeen?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  ConversationParticipant?: Prisma.ConversationParticipantUncheckedUpdateManyWithoutUserNestedInput
-  FriendRequest_FriendRequest_receiverIdToUser?: Prisma.FriendRequestUncheckedUpdateManyWithoutUser_FriendRequest_receiverIdToUserNestedInput
-  FriendRequest_FriendRequest_senderIdToUser?: Prisma.FriendRequestUncheckedUpdateManyWithoutUser_FriendRequest_senderIdToUserNestedInput
-  Message?: Prisma.MessageUncheckedUpdateManyWithoutUserNestedInput
-  Reaction?: Prisma.ReactionUncheckedUpdateManyWithoutUserNestedInput
-  ReadReceipt?: Prisma.ReadReceiptUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateManyInput = {
@@ -475,11 +433,6 @@ export type UserUncheckedUpdateManyInput = {
   lastSeen?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
 }
 
-export type UserScalarRelationFilter = {
-  is?: Prisma.UserWhereInput
-  isNot?: Prisma.UserWhereInput
-}
-
 export type UserCountOrderByAggregateInput = {
   id?: Prisma.SortOrder
   email?: Prisma.SortOrder
@@ -528,768 +481,18 @@ export type UserMinOrderByAggregateInput = {
   lastSeen?: Prisma.SortOrder
 }
 
-export type UserCreateNestedOneWithoutConversationParticipantInput = {
-  create?: Prisma.XOR<Prisma.UserCreateWithoutConversationParticipantInput, Prisma.UserUncheckedCreateWithoutConversationParticipantInput>
-  connectOrCreate?: Prisma.UserCreateOrConnectWithoutConversationParticipantInput
-  connect?: Prisma.UserWhereUniqueInput
-}
-
-export type UserUpdateOneRequiredWithoutConversationParticipantNestedInput = {
-  create?: Prisma.XOR<Prisma.UserCreateWithoutConversationParticipantInput, Prisma.UserUncheckedCreateWithoutConversationParticipantInput>
-  connectOrCreate?: Prisma.UserCreateOrConnectWithoutConversationParticipantInput
-  upsert?: Prisma.UserUpsertWithoutConversationParticipantInput
-  connect?: Prisma.UserWhereUniqueInput
-  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutConversationParticipantInput, Prisma.UserUpdateWithoutConversationParticipantInput>, Prisma.UserUncheckedUpdateWithoutConversationParticipantInput>
-}
-
-export type UserCreateNestedOneWithoutFriendRequest_FriendRequest_receiverIdToUserInput = {
-  create?: Prisma.XOR<Prisma.UserCreateWithoutFriendRequest_FriendRequest_receiverIdToUserInput, Prisma.UserUncheckedCreateWithoutFriendRequest_FriendRequest_receiverIdToUserInput>
-  connectOrCreate?: Prisma.UserCreateOrConnectWithoutFriendRequest_FriendRequest_receiverIdToUserInput
-  connect?: Prisma.UserWhereUniqueInput
-}
-
-export type UserCreateNestedOneWithoutFriendRequest_FriendRequest_senderIdToUserInput = {
-  create?: Prisma.XOR<Prisma.UserCreateWithoutFriendRequest_FriendRequest_senderIdToUserInput, Prisma.UserUncheckedCreateWithoutFriendRequest_FriendRequest_senderIdToUserInput>
-  connectOrCreate?: Prisma.UserCreateOrConnectWithoutFriendRequest_FriendRequest_senderIdToUserInput
-  connect?: Prisma.UserWhereUniqueInput
-}
-
-export type UserUpdateOneRequiredWithoutFriendRequest_FriendRequest_receiverIdToUserNestedInput = {
-  create?: Prisma.XOR<Prisma.UserCreateWithoutFriendRequest_FriendRequest_receiverIdToUserInput, Prisma.UserUncheckedCreateWithoutFriendRequest_FriendRequest_receiverIdToUserInput>
-  connectOrCreate?: Prisma.UserCreateOrConnectWithoutFriendRequest_FriendRequest_receiverIdToUserInput
-  upsert?: Prisma.UserUpsertWithoutFriendRequest_FriendRequest_receiverIdToUserInput
-  connect?: Prisma.UserWhereUniqueInput
-  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutFriendRequest_FriendRequest_receiverIdToUserInput, Prisma.UserUpdateWithoutFriendRequest_FriendRequest_receiverIdToUserInput>, Prisma.UserUncheckedUpdateWithoutFriendRequest_FriendRequest_receiverIdToUserInput>
-}
-
-export type UserUpdateOneRequiredWithoutFriendRequest_FriendRequest_senderIdToUserNestedInput = {
-  create?: Prisma.XOR<Prisma.UserCreateWithoutFriendRequest_FriendRequest_senderIdToUserInput, Prisma.UserUncheckedCreateWithoutFriendRequest_FriendRequest_senderIdToUserInput>
-  connectOrCreate?: Prisma.UserCreateOrConnectWithoutFriendRequest_FriendRequest_senderIdToUserInput
-  upsert?: Prisma.UserUpsertWithoutFriendRequest_FriendRequest_senderIdToUserInput
-  connect?: Prisma.UserWhereUniqueInput
-  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutFriendRequest_FriendRequest_senderIdToUserInput, Prisma.UserUpdateWithoutFriendRequest_FriendRequest_senderIdToUserInput>, Prisma.UserUncheckedUpdateWithoutFriendRequest_FriendRequest_senderIdToUserInput>
-}
-
-export type UserCreateNestedOneWithoutMessageInput = {
-  create?: Prisma.XOR<Prisma.UserCreateWithoutMessageInput, Prisma.UserUncheckedCreateWithoutMessageInput>
-  connectOrCreate?: Prisma.UserCreateOrConnectWithoutMessageInput
-  connect?: Prisma.UserWhereUniqueInput
-}
-
-export type UserUpdateOneRequiredWithoutMessageNestedInput = {
-  create?: Prisma.XOR<Prisma.UserCreateWithoutMessageInput, Prisma.UserUncheckedCreateWithoutMessageInput>
-  connectOrCreate?: Prisma.UserCreateOrConnectWithoutMessageInput
-  upsert?: Prisma.UserUpsertWithoutMessageInput
-  connect?: Prisma.UserWhereUniqueInput
-  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutMessageInput, Prisma.UserUpdateWithoutMessageInput>, Prisma.UserUncheckedUpdateWithoutMessageInput>
-}
-
-export type UserCreateNestedOneWithoutReactionInput = {
-  create?: Prisma.XOR<Prisma.UserCreateWithoutReactionInput, Prisma.UserUncheckedCreateWithoutReactionInput>
-  connectOrCreate?: Prisma.UserCreateOrConnectWithoutReactionInput
-  connect?: Prisma.UserWhereUniqueInput
-}
-
-export type UserUpdateOneRequiredWithoutReactionNestedInput = {
-  create?: Prisma.XOR<Prisma.UserCreateWithoutReactionInput, Prisma.UserUncheckedCreateWithoutReactionInput>
-  connectOrCreate?: Prisma.UserCreateOrConnectWithoutReactionInput
-  upsert?: Prisma.UserUpsertWithoutReactionInput
-  connect?: Prisma.UserWhereUniqueInput
-  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutReactionInput, Prisma.UserUpdateWithoutReactionInput>, Prisma.UserUncheckedUpdateWithoutReactionInput>
-}
-
-export type UserCreateNestedOneWithoutReadReceiptInput = {
-  create?: Prisma.XOR<Prisma.UserCreateWithoutReadReceiptInput, Prisma.UserUncheckedCreateWithoutReadReceiptInput>
-  connectOrCreate?: Prisma.UserCreateOrConnectWithoutReadReceiptInput
-  connect?: Prisma.UserWhereUniqueInput
-}
-
-export type UserUpdateOneRequiredWithoutReadReceiptNestedInput = {
-  create?: Prisma.XOR<Prisma.UserCreateWithoutReadReceiptInput, Prisma.UserUncheckedCreateWithoutReadReceiptInput>
-  connectOrCreate?: Prisma.UserCreateOrConnectWithoutReadReceiptInput
-  upsert?: Prisma.UserUpsertWithoutReadReceiptInput
-  connect?: Prisma.UserWhereUniqueInput
-  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutReadReceiptInput, Prisma.UserUpdateWithoutReadReceiptInput>, Prisma.UserUncheckedUpdateWithoutReadReceiptInput>
+export type NullableStringFieldUpdateOperationsInput = {
+  set?: string | null
 }
 
 export type EnumauthProviderFieldUpdateOperationsInput = {
   set?: $Enums.authProvider
 }
 
-export type UserCreateWithoutConversationParticipantInput = {
-  id: string
-  email: string
-  password?: string | null
-  fullName?: string | null
-  avatar?: string | null
-  createdAt?: Date | string
-  updatedAt: Date | string
-  role?: string
-  googleId?: string | null
-  typeAuth?: $Enums.authProvider
-  bio?: string | null
-  isOnline?: boolean
-  lastSeen?: Date | string | null
-  FriendRequest_FriendRequest_receiverIdToUser?: Prisma.FriendRequestCreateNestedManyWithoutUser_FriendRequest_receiverIdToUserInput
-  FriendRequest_FriendRequest_senderIdToUser?: Prisma.FriendRequestCreateNestedManyWithoutUser_FriendRequest_senderIdToUserInput
-  Message?: Prisma.MessageCreateNestedManyWithoutUserInput
-  Reaction?: Prisma.ReactionCreateNestedManyWithoutUserInput
-  ReadReceipt?: Prisma.ReadReceiptCreateNestedManyWithoutUserInput
+export type NullableDateTimeFieldUpdateOperationsInput = {
+  set?: Date | string | null
 }
 
-export type UserUncheckedCreateWithoutConversationParticipantInput = {
-  id: string
-  email: string
-  password?: string | null
-  fullName?: string | null
-  avatar?: string | null
-  createdAt?: Date | string
-  updatedAt: Date | string
-  role?: string
-  googleId?: string | null
-  typeAuth?: $Enums.authProvider
-  bio?: string | null
-  isOnline?: boolean
-  lastSeen?: Date | string | null
-  FriendRequest_FriendRequest_receiverIdToUser?: Prisma.FriendRequestUncheckedCreateNestedManyWithoutUser_FriendRequest_receiverIdToUserInput
-  FriendRequest_FriendRequest_senderIdToUser?: Prisma.FriendRequestUncheckedCreateNestedManyWithoutUser_FriendRequest_senderIdToUserInput
-  Message?: Prisma.MessageUncheckedCreateNestedManyWithoutUserInput
-  Reaction?: Prisma.ReactionUncheckedCreateNestedManyWithoutUserInput
-  ReadReceipt?: Prisma.ReadReceiptUncheckedCreateNestedManyWithoutUserInput
-}
-
-export type UserCreateOrConnectWithoutConversationParticipantInput = {
-  where: Prisma.UserWhereUniqueInput
-  create: Prisma.XOR<Prisma.UserCreateWithoutConversationParticipantInput, Prisma.UserUncheckedCreateWithoutConversationParticipantInput>
-}
-
-export type UserUpsertWithoutConversationParticipantInput = {
-  update: Prisma.XOR<Prisma.UserUpdateWithoutConversationParticipantInput, Prisma.UserUncheckedUpdateWithoutConversationParticipantInput>
-  create: Prisma.XOR<Prisma.UserCreateWithoutConversationParticipantInput, Prisma.UserUncheckedCreateWithoutConversationParticipantInput>
-  where?: Prisma.UserWhereInput
-}
-
-export type UserUpdateToOneWithWhereWithoutConversationParticipantInput = {
-  where?: Prisma.UserWhereInput
-  data: Prisma.XOR<Prisma.UserUpdateWithoutConversationParticipantInput, Prisma.UserUncheckedUpdateWithoutConversationParticipantInput>
-}
-
-export type UserUpdateWithoutConversationParticipantInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
-  email?: Prisma.StringFieldUpdateOperationsInput | string
-  password?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  fullName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  avatar?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  role?: Prisma.StringFieldUpdateOperationsInput | string
-  googleId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  typeAuth?: Prisma.EnumauthProviderFieldUpdateOperationsInput | $Enums.authProvider
-  bio?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  isOnline?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  lastSeen?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  FriendRequest_FriendRequest_receiverIdToUser?: Prisma.FriendRequestUpdateManyWithoutUser_FriendRequest_receiverIdToUserNestedInput
-  FriendRequest_FriendRequest_senderIdToUser?: Prisma.FriendRequestUpdateManyWithoutUser_FriendRequest_senderIdToUserNestedInput
-  Message?: Prisma.MessageUpdateManyWithoutUserNestedInput
-  Reaction?: Prisma.ReactionUpdateManyWithoutUserNestedInput
-  ReadReceipt?: Prisma.ReadReceiptUpdateManyWithoutUserNestedInput
-}
-
-export type UserUncheckedUpdateWithoutConversationParticipantInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
-  email?: Prisma.StringFieldUpdateOperationsInput | string
-  password?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  fullName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  avatar?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  role?: Prisma.StringFieldUpdateOperationsInput | string
-  googleId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  typeAuth?: Prisma.EnumauthProviderFieldUpdateOperationsInput | $Enums.authProvider
-  bio?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  isOnline?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  lastSeen?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  FriendRequest_FriendRequest_receiverIdToUser?: Prisma.FriendRequestUncheckedUpdateManyWithoutUser_FriendRequest_receiverIdToUserNestedInput
-  FriendRequest_FriendRequest_senderIdToUser?: Prisma.FriendRequestUncheckedUpdateManyWithoutUser_FriendRequest_senderIdToUserNestedInput
-  Message?: Prisma.MessageUncheckedUpdateManyWithoutUserNestedInput
-  Reaction?: Prisma.ReactionUncheckedUpdateManyWithoutUserNestedInput
-  ReadReceipt?: Prisma.ReadReceiptUncheckedUpdateManyWithoutUserNestedInput
-}
-
-export type UserCreateWithoutFriendRequest_FriendRequest_receiverIdToUserInput = {
-  id: string
-  email: string
-  password?: string | null
-  fullName?: string | null
-  avatar?: string | null
-  createdAt?: Date | string
-  updatedAt: Date | string
-  role?: string
-  googleId?: string | null
-  typeAuth?: $Enums.authProvider
-  bio?: string | null
-  isOnline?: boolean
-  lastSeen?: Date | string | null
-  ConversationParticipant?: Prisma.ConversationParticipantCreateNestedManyWithoutUserInput
-  FriendRequest_FriendRequest_senderIdToUser?: Prisma.FriendRequestCreateNestedManyWithoutUser_FriendRequest_senderIdToUserInput
-  Message?: Prisma.MessageCreateNestedManyWithoutUserInput
-  Reaction?: Prisma.ReactionCreateNestedManyWithoutUserInput
-  ReadReceipt?: Prisma.ReadReceiptCreateNestedManyWithoutUserInput
-}
-
-export type UserUncheckedCreateWithoutFriendRequest_FriendRequest_receiverIdToUserInput = {
-  id: string
-  email: string
-  password?: string | null
-  fullName?: string | null
-  avatar?: string | null
-  createdAt?: Date | string
-  updatedAt: Date | string
-  role?: string
-  googleId?: string | null
-  typeAuth?: $Enums.authProvider
-  bio?: string | null
-  isOnline?: boolean
-  lastSeen?: Date | string | null
-  ConversationParticipant?: Prisma.ConversationParticipantUncheckedCreateNestedManyWithoutUserInput
-  FriendRequest_FriendRequest_senderIdToUser?: Prisma.FriendRequestUncheckedCreateNestedManyWithoutUser_FriendRequest_senderIdToUserInput
-  Message?: Prisma.MessageUncheckedCreateNestedManyWithoutUserInput
-  Reaction?: Prisma.ReactionUncheckedCreateNestedManyWithoutUserInput
-  ReadReceipt?: Prisma.ReadReceiptUncheckedCreateNestedManyWithoutUserInput
-}
-
-export type UserCreateOrConnectWithoutFriendRequest_FriendRequest_receiverIdToUserInput = {
-  where: Prisma.UserWhereUniqueInput
-  create: Prisma.XOR<Prisma.UserCreateWithoutFriendRequest_FriendRequest_receiverIdToUserInput, Prisma.UserUncheckedCreateWithoutFriendRequest_FriendRequest_receiverIdToUserInput>
-}
-
-export type UserCreateWithoutFriendRequest_FriendRequest_senderIdToUserInput = {
-  id: string
-  email: string
-  password?: string | null
-  fullName?: string | null
-  avatar?: string | null
-  createdAt?: Date | string
-  updatedAt: Date | string
-  role?: string
-  googleId?: string | null
-  typeAuth?: $Enums.authProvider
-  bio?: string | null
-  isOnline?: boolean
-  lastSeen?: Date | string | null
-  ConversationParticipant?: Prisma.ConversationParticipantCreateNestedManyWithoutUserInput
-  FriendRequest_FriendRequest_receiverIdToUser?: Prisma.FriendRequestCreateNestedManyWithoutUser_FriendRequest_receiverIdToUserInput
-  Message?: Prisma.MessageCreateNestedManyWithoutUserInput
-  Reaction?: Prisma.ReactionCreateNestedManyWithoutUserInput
-  ReadReceipt?: Prisma.ReadReceiptCreateNestedManyWithoutUserInput
-}
-
-export type UserUncheckedCreateWithoutFriendRequest_FriendRequest_senderIdToUserInput = {
-  id: string
-  email: string
-  password?: string | null
-  fullName?: string | null
-  avatar?: string | null
-  createdAt?: Date | string
-  updatedAt: Date | string
-  role?: string
-  googleId?: string | null
-  typeAuth?: $Enums.authProvider
-  bio?: string | null
-  isOnline?: boolean
-  lastSeen?: Date | string | null
-  ConversationParticipant?: Prisma.ConversationParticipantUncheckedCreateNestedManyWithoutUserInput
-  FriendRequest_FriendRequest_receiverIdToUser?: Prisma.FriendRequestUncheckedCreateNestedManyWithoutUser_FriendRequest_receiverIdToUserInput
-  Message?: Prisma.MessageUncheckedCreateNestedManyWithoutUserInput
-  Reaction?: Prisma.ReactionUncheckedCreateNestedManyWithoutUserInput
-  ReadReceipt?: Prisma.ReadReceiptUncheckedCreateNestedManyWithoutUserInput
-}
-
-export type UserCreateOrConnectWithoutFriendRequest_FriendRequest_senderIdToUserInput = {
-  where: Prisma.UserWhereUniqueInput
-  create: Prisma.XOR<Prisma.UserCreateWithoutFriendRequest_FriendRequest_senderIdToUserInput, Prisma.UserUncheckedCreateWithoutFriendRequest_FriendRequest_senderIdToUserInput>
-}
-
-export type UserUpsertWithoutFriendRequest_FriendRequest_receiverIdToUserInput = {
-  update: Prisma.XOR<Prisma.UserUpdateWithoutFriendRequest_FriendRequest_receiverIdToUserInput, Prisma.UserUncheckedUpdateWithoutFriendRequest_FriendRequest_receiverIdToUserInput>
-  create: Prisma.XOR<Prisma.UserCreateWithoutFriendRequest_FriendRequest_receiverIdToUserInput, Prisma.UserUncheckedCreateWithoutFriendRequest_FriendRequest_receiverIdToUserInput>
-  where?: Prisma.UserWhereInput
-}
-
-export type UserUpdateToOneWithWhereWithoutFriendRequest_FriendRequest_receiverIdToUserInput = {
-  where?: Prisma.UserWhereInput
-  data: Prisma.XOR<Prisma.UserUpdateWithoutFriendRequest_FriendRequest_receiverIdToUserInput, Prisma.UserUncheckedUpdateWithoutFriendRequest_FriendRequest_receiverIdToUserInput>
-}
-
-export type UserUpdateWithoutFriendRequest_FriendRequest_receiverIdToUserInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
-  email?: Prisma.StringFieldUpdateOperationsInput | string
-  password?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  fullName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  avatar?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  role?: Prisma.StringFieldUpdateOperationsInput | string
-  googleId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  typeAuth?: Prisma.EnumauthProviderFieldUpdateOperationsInput | $Enums.authProvider
-  bio?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  isOnline?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  lastSeen?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  ConversationParticipant?: Prisma.ConversationParticipantUpdateManyWithoutUserNestedInput
-  FriendRequest_FriendRequest_senderIdToUser?: Prisma.FriendRequestUpdateManyWithoutUser_FriendRequest_senderIdToUserNestedInput
-  Message?: Prisma.MessageUpdateManyWithoutUserNestedInput
-  Reaction?: Prisma.ReactionUpdateManyWithoutUserNestedInput
-  ReadReceipt?: Prisma.ReadReceiptUpdateManyWithoutUserNestedInput
-}
-
-export type UserUncheckedUpdateWithoutFriendRequest_FriendRequest_receiverIdToUserInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
-  email?: Prisma.StringFieldUpdateOperationsInput | string
-  password?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  fullName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  avatar?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  role?: Prisma.StringFieldUpdateOperationsInput | string
-  googleId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  typeAuth?: Prisma.EnumauthProviderFieldUpdateOperationsInput | $Enums.authProvider
-  bio?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  isOnline?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  lastSeen?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  ConversationParticipant?: Prisma.ConversationParticipantUncheckedUpdateManyWithoutUserNestedInput
-  FriendRequest_FriendRequest_senderIdToUser?: Prisma.FriendRequestUncheckedUpdateManyWithoutUser_FriendRequest_senderIdToUserNestedInput
-  Message?: Prisma.MessageUncheckedUpdateManyWithoutUserNestedInput
-  Reaction?: Prisma.ReactionUncheckedUpdateManyWithoutUserNestedInput
-  ReadReceipt?: Prisma.ReadReceiptUncheckedUpdateManyWithoutUserNestedInput
-}
-
-export type UserUpsertWithoutFriendRequest_FriendRequest_senderIdToUserInput = {
-  update: Prisma.XOR<Prisma.UserUpdateWithoutFriendRequest_FriendRequest_senderIdToUserInput, Prisma.UserUncheckedUpdateWithoutFriendRequest_FriendRequest_senderIdToUserInput>
-  create: Prisma.XOR<Prisma.UserCreateWithoutFriendRequest_FriendRequest_senderIdToUserInput, Prisma.UserUncheckedCreateWithoutFriendRequest_FriendRequest_senderIdToUserInput>
-  where?: Prisma.UserWhereInput
-}
-
-export type UserUpdateToOneWithWhereWithoutFriendRequest_FriendRequest_senderIdToUserInput = {
-  where?: Prisma.UserWhereInput
-  data: Prisma.XOR<Prisma.UserUpdateWithoutFriendRequest_FriendRequest_senderIdToUserInput, Prisma.UserUncheckedUpdateWithoutFriendRequest_FriendRequest_senderIdToUserInput>
-}
-
-export type UserUpdateWithoutFriendRequest_FriendRequest_senderIdToUserInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
-  email?: Prisma.StringFieldUpdateOperationsInput | string
-  password?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  fullName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  avatar?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  role?: Prisma.StringFieldUpdateOperationsInput | string
-  googleId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  typeAuth?: Prisma.EnumauthProviderFieldUpdateOperationsInput | $Enums.authProvider
-  bio?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  isOnline?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  lastSeen?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  ConversationParticipant?: Prisma.ConversationParticipantUpdateManyWithoutUserNestedInput
-  FriendRequest_FriendRequest_receiverIdToUser?: Prisma.FriendRequestUpdateManyWithoutUser_FriendRequest_receiverIdToUserNestedInput
-  Message?: Prisma.MessageUpdateManyWithoutUserNestedInput
-  Reaction?: Prisma.ReactionUpdateManyWithoutUserNestedInput
-  ReadReceipt?: Prisma.ReadReceiptUpdateManyWithoutUserNestedInput
-}
-
-export type UserUncheckedUpdateWithoutFriendRequest_FriendRequest_senderIdToUserInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
-  email?: Prisma.StringFieldUpdateOperationsInput | string
-  password?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  fullName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  avatar?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  role?: Prisma.StringFieldUpdateOperationsInput | string
-  googleId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  typeAuth?: Prisma.EnumauthProviderFieldUpdateOperationsInput | $Enums.authProvider
-  bio?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  isOnline?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  lastSeen?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  ConversationParticipant?: Prisma.ConversationParticipantUncheckedUpdateManyWithoutUserNestedInput
-  FriendRequest_FriendRequest_receiverIdToUser?: Prisma.FriendRequestUncheckedUpdateManyWithoutUser_FriendRequest_receiverIdToUserNestedInput
-  Message?: Prisma.MessageUncheckedUpdateManyWithoutUserNestedInput
-  Reaction?: Prisma.ReactionUncheckedUpdateManyWithoutUserNestedInput
-  ReadReceipt?: Prisma.ReadReceiptUncheckedUpdateManyWithoutUserNestedInput
-}
-
-export type UserCreateWithoutMessageInput = {
-  id: string
-  email: string
-  password?: string | null
-  fullName?: string | null
-  avatar?: string | null
-  createdAt?: Date | string
-  updatedAt: Date | string
-  role?: string
-  googleId?: string | null
-  typeAuth?: $Enums.authProvider
-  bio?: string | null
-  isOnline?: boolean
-  lastSeen?: Date | string | null
-  ConversationParticipant?: Prisma.ConversationParticipantCreateNestedManyWithoutUserInput
-  FriendRequest_FriendRequest_receiverIdToUser?: Prisma.FriendRequestCreateNestedManyWithoutUser_FriendRequest_receiverIdToUserInput
-  FriendRequest_FriendRequest_senderIdToUser?: Prisma.FriendRequestCreateNestedManyWithoutUser_FriendRequest_senderIdToUserInput
-  Reaction?: Prisma.ReactionCreateNestedManyWithoutUserInput
-  ReadReceipt?: Prisma.ReadReceiptCreateNestedManyWithoutUserInput
-}
-
-export type UserUncheckedCreateWithoutMessageInput = {
-  id: string
-  email: string
-  password?: string | null
-  fullName?: string | null
-  avatar?: string | null
-  createdAt?: Date | string
-  updatedAt: Date | string
-  role?: string
-  googleId?: string | null
-  typeAuth?: $Enums.authProvider
-  bio?: string | null
-  isOnline?: boolean
-  lastSeen?: Date | string | null
-  ConversationParticipant?: Prisma.ConversationParticipantUncheckedCreateNestedManyWithoutUserInput
-  FriendRequest_FriendRequest_receiverIdToUser?: Prisma.FriendRequestUncheckedCreateNestedManyWithoutUser_FriendRequest_receiverIdToUserInput
-  FriendRequest_FriendRequest_senderIdToUser?: Prisma.FriendRequestUncheckedCreateNestedManyWithoutUser_FriendRequest_senderIdToUserInput
-  Reaction?: Prisma.ReactionUncheckedCreateNestedManyWithoutUserInput
-  ReadReceipt?: Prisma.ReadReceiptUncheckedCreateNestedManyWithoutUserInput
-}
-
-export type UserCreateOrConnectWithoutMessageInput = {
-  where: Prisma.UserWhereUniqueInput
-  create: Prisma.XOR<Prisma.UserCreateWithoutMessageInput, Prisma.UserUncheckedCreateWithoutMessageInput>
-}
-
-export type UserUpsertWithoutMessageInput = {
-  update: Prisma.XOR<Prisma.UserUpdateWithoutMessageInput, Prisma.UserUncheckedUpdateWithoutMessageInput>
-  create: Prisma.XOR<Prisma.UserCreateWithoutMessageInput, Prisma.UserUncheckedCreateWithoutMessageInput>
-  where?: Prisma.UserWhereInput
-}
-
-export type UserUpdateToOneWithWhereWithoutMessageInput = {
-  where?: Prisma.UserWhereInput
-  data: Prisma.XOR<Prisma.UserUpdateWithoutMessageInput, Prisma.UserUncheckedUpdateWithoutMessageInput>
-}
-
-export type UserUpdateWithoutMessageInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
-  email?: Prisma.StringFieldUpdateOperationsInput | string
-  password?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  fullName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  avatar?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  role?: Prisma.StringFieldUpdateOperationsInput | string
-  googleId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  typeAuth?: Prisma.EnumauthProviderFieldUpdateOperationsInput | $Enums.authProvider
-  bio?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  isOnline?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  lastSeen?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  ConversationParticipant?: Prisma.ConversationParticipantUpdateManyWithoutUserNestedInput
-  FriendRequest_FriendRequest_receiverIdToUser?: Prisma.FriendRequestUpdateManyWithoutUser_FriendRequest_receiverIdToUserNestedInput
-  FriendRequest_FriendRequest_senderIdToUser?: Prisma.FriendRequestUpdateManyWithoutUser_FriendRequest_senderIdToUserNestedInput
-  Reaction?: Prisma.ReactionUpdateManyWithoutUserNestedInput
-  ReadReceipt?: Prisma.ReadReceiptUpdateManyWithoutUserNestedInput
-}
-
-export type UserUncheckedUpdateWithoutMessageInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
-  email?: Prisma.StringFieldUpdateOperationsInput | string
-  password?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  fullName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  avatar?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  role?: Prisma.StringFieldUpdateOperationsInput | string
-  googleId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  typeAuth?: Prisma.EnumauthProviderFieldUpdateOperationsInput | $Enums.authProvider
-  bio?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  isOnline?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  lastSeen?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  ConversationParticipant?: Prisma.ConversationParticipantUncheckedUpdateManyWithoutUserNestedInput
-  FriendRequest_FriendRequest_receiverIdToUser?: Prisma.FriendRequestUncheckedUpdateManyWithoutUser_FriendRequest_receiverIdToUserNestedInput
-  FriendRequest_FriendRequest_senderIdToUser?: Prisma.FriendRequestUncheckedUpdateManyWithoutUser_FriendRequest_senderIdToUserNestedInput
-  Reaction?: Prisma.ReactionUncheckedUpdateManyWithoutUserNestedInput
-  ReadReceipt?: Prisma.ReadReceiptUncheckedUpdateManyWithoutUserNestedInput
-}
-
-export type UserCreateWithoutReactionInput = {
-  id: string
-  email: string
-  password?: string | null
-  fullName?: string | null
-  avatar?: string | null
-  createdAt?: Date | string
-  updatedAt: Date | string
-  role?: string
-  googleId?: string | null
-  typeAuth?: $Enums.authProvider
-  bio?: string | null
-  isOnline?: boolean
-  lastSeen?: Date | string | null
-  ConversationParticipant?: Prisma.ConversationParticipantCreateNestedManyWithoutUserInput
-  FriendRequest_FriendRequest_receiverIdToUser?: Prisma.FriendRequestCreateNestedManyWithoutUser_FriendRequest_receiverIdToUserInput
-  FriendRequest_FriendRequest_senderIdToUser?: Prisma.FriendRequestCreateNestedManyWithoutUser_FriendRequest_senderIdToUserInput
-  Message?: Prisma.MessageCreateNestedManyWithoutUserInput
-  ReadReceipt?: Prisma.ReadReceiptCreateNestedManyWithoutUserInput
-}
-
-export type UserUncheckedCreateWithoutReactionInput = {
-  id: string
-  email: string
-  password?: string | null
-  fullName?: string | null
-  avatar?: string | null
-  createdAt?: Date | string
-  updatedAt: Date | string
-  role?: string
-  googleId?: string | null
-  typeAuth?: $Enums.authProvider
-  bio?: string | null
-  isOnline?: boolean
-  lastSeen?: Date | string | null
-  ConversationParticipant?: Prisma.ConversationParticipantUncheckedCreateNestedManyWithoutUserInput
-  FriendRequest_FriendRequest_receiverIdToUser?: Prisma.FriendRequestUncheckedCreateNestedManyWithoutUser_FriendRequest_receiverIdToUserInput
-  FriendRequest_FriendRequest_senderIdToUser?: Prisma.FriendRequestUncheckedCreateNestedManyWithoutUser_FriendRequest_senderIdToUserInput
-  Message?: Prisma.MessageUncheckedCreateNestedManyWithoutUserInput
-  ReadReceipt?: Prisma.ReadReceiptUncheckedCreateNestedManyWithoutUserInput
-}
-
-export type UserCreateOrConnectWithoutReactionInput = {
-  where: Prisma.UserWhereUniqueInput
-  create: Prisma.XOR<Prisma.UserCreateWithoutReactionInput, Prisma.UserUncheckedCreateWithoutReactionInput>
-}
-
-export type UserUpsertWithoutReactionInput = {
-  update: Prisma.XOR<Prisma.UserUpdateWithoutReactionInput, Prisma.UserUncheckedUpdateWithoutReactionInput>
-  create: Prisma.XOR<Prisma.UserCreateWithoutReactionInput, Prisma.UserUncheckedCreateWithoutReactionInput>
-  where?: Prisma.UserWhereInput
-}
-
-export type UserUpdateToOneWithWhereWithoutReactionInput = {
-  where?: Prisma.UserWhereInput
-  data: Prisma.XOR<Prisma.UserUpdateWithoutReactionInput, Prisma.UserUncheckedUpdateWithoutReactionInput>
-}
-
-export type UserUpdateWithoutReactionInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
-  email?: Prisma.StringFieldUpdateOperationsInput | string
-  password?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  fullName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  avatar?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  role?: Prisma.StringFieldUpdateOperationsInput | string
-  googleId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  typeAuth?: Prisma.EnumauthProviderFieldUpdateOperationsInput | $Enums.authProvider
-  bio?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  isOnline?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  lastSeen?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  ConversationParticipant?: Prisma.ConversationParticipantUpdateManyWithoutUserNestedInput
-  FriendRequest_FriendRequest_receiverIdToUser?: Prisma.FriendRequestUpdateManyWithoutUser_FriendRequest_receiverIdToUserNestedInput
-  FriendRequest_FriendRequest_senderIdToUser?: Prisma.FriendRequestUpdateManyWithoutUser_FriendRequest_senderIdToUserNestedInput
-  Message?: Prisma.MessageUpdateManyWithoutUserNestedInput
-  ReadReceipt?: Prisma.ReadReceiptUpdateManyWithoutUserNestedInput
-}
-
-export type UserUncheckedUpdateWithoutReactionInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
-  email?: Prisma.StringFieldUpdateOperationsInput | string
-  password?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  fullName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  avatar?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  role?: Prisma.StringFieldUpdateOperationsInput | string
-  googleId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  typeAuth?: Prisma.EnumauthProviderFieldUpdateOperationsInput | $Enums.authProvider
-  bio?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  isOnline?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  lastSeen?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  ConversationParticipant?: Prisma.ConversationParticipantUncheckedUpdateManyWithoutUserNestedInput
-  FriendRequest_FriendRequest_receiverIdToUser?: Prisma.FriendRequestUncheckedUpdateManyWithoutUser_FriendRequest_receiverIdToUserNestedInput
-  FriendRequest_FriendRequest_senderIdToUser?: Prisma.FriendRequestUncheckedUpdateManyWithoutUser_FriendRequest_senderIdToUserNestedInput
-  Message?: Prisma.MessageUncheckedUpdateManyWithoutUserNestedInput
-  ReadReceipt?: Prisma.ReadReceiptUncheckedUpdateManyWithoutUserNestedInput
-}
-
-export type UserCreateWithoutReadReceiptInput = {
-  id: string
-  email: string
-  password?: string | null
-  fullName?: string | null
-  avatar?: string | null
-  createdAt?: Date | string
-  updatedAt: Date | string
-  role?: string
-  googleId?: string | null
-  typeAuth?: $Enums.authProvider
-  bio?: string | null
-  isOnline?: boolean
-  lastSeen?: Date | string | null
-  ConversationParticipant?: Prisma.ConversationParticipantCreateNestedManyWithoutUserInput
-  FriendRequest_FriendRequest_receiverIdToUser?: Prisma.FriendRequestCreateNestedManyWithoutUser_FriendRequest_receiverIdToUserInput
-  FriendRequest_FriendRequest_senderIdToUser?: Prisma.FriendRequestCreateNestedManyWithoutUser_FriendRequest_senderIdToUserInput
-  Message?: Prisma.MessageCreateNestedManyWithoutUserInput
-  Reaction?: Prisma.ReactionCreateNestedManyWithoutUserInput
-}
-
-export type UserUncheckedCreateWithoutReadReceiptInput = {
-  id: string
-  email: string
-  password?: string | null
-  fullName?: string | null
-  avatar?: string | null
-  createdAt?: Date | string
-  updatedAt: Date | string
-  role?: string
-  googleId?: string | null
-  typeAuth?: $Enums.authProvider
-  bio?: string | null
-  isOnline?: boolean
-  lastSeen?: Date | string | null
-  ConversationParticipant?: Prisma.ConversationParticipantUncheckedCreateNestedManyWithoutUserInput
-  FriendRequest_FriendRequest_receiverIdToUser?: Prisma.FriendRequestUncheckedCreateNestedManyWithoutUser_FriendRequest_receiverIdToUserInput
-  FriendRequest_FriendRequest_senderIdToUser?: Prisma.FriendRequestUncheckedCreateNestedManyWithoutUser_FriendRequest_senderIdToUserInput
-  Message?: Prisma.MessageUncheckedCreateNestedManyWithoutUserInput
-  Reaction?: Prisma.ReactionUncheckedCreateNestedManyWithoutUserInput
-}
-
-export type UserCreateOrConnectWithoutReadReceiptInput = {
-  where: Prisma.UserWhereUniqueInput
-  create: Prisma.XOR<Prisma.UserCreateWithoutReadReceiptInput, Prisma.UserUncheckedCreateWithoutReadReceiptInput>
-}
-
-export type UserUpsertWithoutReadReceiptInput = {
-  update: Prisma.XOR<Prisma.UserUpdateWithoutReadReceiptInput, Prisma.UserUncheckedUpdateWithoutReadReceiptInput>
-  create: Prisma.XOR<Prisma.UserCreateWithoutReadReceiptInput, Prisma.UserUncheckedCreateWithoutReadReceiptInput>
-  where?: Prisma.UserWhereInput
-}
-
-export type UserUpdateToOneWithWhereWithoutReadReceiptInput = {
-  where?: Prisma.UserWhereInput
-  data: Prisma.XOR<Prisma.UserUpdateWithoutReadReceiptInput, Prisma.UserUncheckedUpdateWithoutReadReceiptInput>
-}
-
-export type UserUpdateWithoutReadReceiptInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
-  email?: Prisma.StringFieldUpdateOperationsInput | string
-  password?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  fullName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  avatar?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  role?: Prisma.StringFieldUpdateOperationsInput | string
-  googleId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  typeAuth?: Prisma.EnumauthProviderFieldUpdateOperationsInput | $Enums.authProvider
-  bio?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  isOnline?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  lastSeen?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  ConversationParticipant?: Prisma.ConversationParticipantUpdateManyWithoutUserNestedInput
-  FriendRequest_FriendRequest_receiverIdToUser?: Prisma.FriendRequestUpdateManyWithoutUser_FriendRequest_receiverIdToUserNestedInput
-  FriendRequest_FriendRequest_senderIdToUser?: Prisma.FriendRequestUpdateManyWithoutUser_FriendRequest_senderIdToUserNestedInput
-  Message?: Prisma.MessageUpdateManyWithoutUserNestedInput
-  Reaction?: Prisma.ReactionUpdateManyWithoutUserNestedInput
-}
-
-export type UserUncheckedUpdateWithoutReadReceiptInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
-  email?: Prisma.StringFieldUpdateOperationsInput | string
-  password?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  fullName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  avatar?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  role?: Prisma.StringFieldUpdateOperationsInput | string
-  googleId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  typeAuth?: Prisma.EnumauthProviderFieldUpdateOperationsInput | $Enums.authProvider
-  bio?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  isOnline?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  lastSeen?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  ConversationParticipant?: Prisma.ConversationParticipantUncheckedUpdateManyWithoutUserNestedInput
-  FriendRequest_FriendRequest_receiverIdToUser?: Prisma.FriendRequestUncheckedUpdateManyWithoutUser_FriendRequest_receiverIdToUserNestedInput
-  FriendRequest_FriendRequest_senderIdToUser?: Prisma.FriendRequestUncheckedUpdateManyWithoutUser_FriendRequest_senderIdToUserNestedInput
-  Message?: Prisma.MessageUncheckedUpdateManyWithoutUserNestedInput
-  Reaction?: Prisma.ReactionUncheckedUpdateManyWithoutUserNestedInput
-}
-
-
-/**
- * Count Type UserCountOutputType
- */
-
-export type UserCountOutputType = {
-  ConversationParticipant: number
-  FriendRequest_FriendRequest_receiverIdToUser: number
-  FriendRequest_FriendRequest_senderIdToUser: number
-  Message: number
-  Reaction: number
-  ReadReceipt: number
-}
-
-export type UserCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  ConversationParticipant?: boolean | UserCountOutputTypeCountConversationParticipantArgs
-  FriendRequest_FriendRequest_receiverIdToUser?: boolean | UserCountOutputTypeCountFriendRequest_FriendRequest_receiverIdToUserArgs
-  FriendRequest_FriendRequest_senderIdToUser?: boolean | UserCountOutputTypeCountFriendRequest_FriendRequest_senderIdToUserArgs
-  Message?: boolean | UserCountOutputTypeCountMessageArgs
-  Reaction?: boolean | UserCountOutputTypeCountReactionArgs
-  ReadReceipt?: boolean | UserCountOutputTypeCountReadReceiptArgs
-}
-
-/**
- * UserCountOutputType without action
- */
-export type UserCountOutputTypeDefaultArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the UserCountOutputType
-   */
-  select?: Prisma.UserCountOutputTypeSelect<ExtArgs> | null
-}
-
-/**
- * UserCountOutputType without action
- */
-export type UserCountOutputTypeCountConversationParticipantArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  where?: Prisma.ConversationParticipantWhereInput
-}
-
-/**
- * UserCountOutputType without action
- */
-export type UserCountOutputTypeCountFriendRequest_FriendRequest_receiverIdToUserArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  where?: Prisma.FriendRequestWhereInput
-}
-
-/**
- * UserCountOutputType without action
- */
-export type UserCountOutputTypeCountFriendRequest_FriendRequest_senderIdToUserArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  where?: Prisma.FriendRequestWhereInput
-}
-
-/**
- * UserCountOutputType without action
- */
-export type UserCountOutputTypeCountMessageArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  where?: Prisma.MessageWhereInput
-}
-
-/**
- * UserCountOutputType without action
- */
-export type UserCountOutputTypeCountReactionArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  where?: Prisma.ReactionWhereInput
-}
-
-/**
- * UserCountOutputType without action
- */
-export type UserCountOutputTypeCountReadReceiptArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  where?: Prisma.ReadReceiptWhereInput
-}
 
 
 export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -1306,13 +509,6 @@ export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   bio?: boolean
   isOnline?: boolean
   lastSeen?: boolean
-  ConversationParticipant?: boolean | Prisma.User$ConversationParticipantArgs<ExtArgs>
-  FriendRequest_FriendRequest_receiverIdToUser?: boolean | Prisma.User$FriendRequest_FriendRequest_receiverIdToUserArgs<ExtArgs>
-  FriendRequest_FriendRequest_senderIdToUser?: boolean | Prisma.User$FriendRequest_FriendRequest_senderIdToUserArgs<ExtArgs>
-  Message?: boolean | Prisma.User$MessageArgs<ExtArgs>
-  Reaction?: boolean | Prisma.User$ReactionArgs<ExtArgs>
-  ReadReceipt?: boolean | Prisma.User$ReadReceiptArgs<ExtArgs>
-  _count?: boolean | Prisma.UserCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["user"]>
 
 export type UserSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -1364,28 +560,10 @@ export type UserSelectScalar = {
 }
 
 export type UserOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "email" | "password" | "fullName" | "avatar" | "createdAt" | "updatedAt" | "role" | "googleId" | "typeAuth" | "bio" | "isOnline" | "lastSeen", ExtArgs["result"]["user"]>
-export type UserInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  ConversationParticipant?: boolean | Prisma.User$ConversationParticipantArgs<ExtArgs>
-  FriendRequest_FriendRequest_receiverIdToUser?: boolean | Prisma.User$FriendRequest_FriendRequest_receiverIdToUserArgs<ExtArgs>
-  FriendRequest_FriendRequest_senderIdToUser?: boolean | Prisma.User$FriendRequest_FriendRequest_senderIdToUserArgs<ExtArgs>
-  Message?: boolean | Prisma.User$MessageArgs<ExtArgs>
-  Reaction?: boolean | Prisma.User$ReactionArgs<ExtArgs>
-  ReadReceipt?: boolean | Prisma.User$ReadReceiptArgs<ExtArgs>
-  _count?: boolean | Prisma.UserCountOutputTypeDefaultArgs<ExtArgs>
-}
-export type UserIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
-export type UserIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
 
 export type $UserPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "User"
-  objects: {
-    ConversationParticipant: Prisma.$ConversationParticipantPayload<ExtArgs>[]
-    FriendRequest_FriendRequest_receiverIdToUser: Prisma.$FriendRequestPayload<ExtArgs>[]
-    FriendRequest_FriendRequest_senderIdToUser: Prisma.$FriendRequestPayload<ExtArgs>[]
-    Message: Prisma.$MessagePayload<ExtArgs>[]
-    Reaction: Prisma.$ReactionPayload<ExtArgs>[]
-    ReadReceipt: Prisma.$ReadReceiptPayload<ExtArgs>[]
-  }
+  objects: {}
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
     email: string
@@ -1794,12 +972,6 @@ readonly fields: UserFieldRefs;
  */
 export interface Prisma__UserClient<T, Null = never, ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
   readonly [Symbol.toStringTag]: "PrismaPromise"
-  ConversationParticipant<T extends Prisma.User$ConversationParticipantArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$ConversationParticipantArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ConversationParticipantPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
-  FriendRequest_FriendRequest_receiverIdToUser<T extends Prisma.User$FriendRequest_FriendRequest_receiverIdToUserArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$FriendRequest_FriendRequest_receiverIdToUserArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$FriendRequestPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
-  FriendRequest_FriendRequest_senderIdToUser<T extends Prisma.User$FriendRequest_FriendRequest_senderIdToUserArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$FriendRequest_FriendRequest_senderIdToUserArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$FriendRequestPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
-  Message<T extends Prisma.User$MessageArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$MessageArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$MessagePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
-  Reaction<T extends Prisma.User$ReactionArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$ReactionArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ReactionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
-  ReadReceipt<T extends Prisma.User$ReadReceiptArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$ReadReceiptArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ReadReceiptPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -1859,10 +1031,6 @@ export type UserFindUniqueArgs<ExtArgs extends runtime.Types.Extensions.Internal
    */
   omit?: Prisma.UserOmit<ExtArgs> | null
   /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.UserInclude<ExtArgs> | null
-  /**
    * Filter, which User to fetch.
    */
   where: Prisma.UserWhereUniqueInput
@@ -1882,10 +1050,6 @@ export type UserFindUniqueOrThrowArgs<ExtArgs extends runtime.Types.Extensions.I
    */
   omit?: Prisma.UserOmit<ExtArgs> | null
   /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.UserInclude<ExtArgs> | null
-  /**
    * Filter, which User to fetch.
    */
   where: Prisma.UserWhereUniqueInput
@@ -1904,10 +1068,6 @@ export type UserFindFirstArgs<ExtArgs extends runtime.Types.Extensions.InternalA
    * Omit specific fields from the User
    */
   omit?: Prisma.UserOmit<ExtArgs> | null
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.UserInclude<ExtArgs> | null
   /**
    * Filter, which User to fetch.
    */
@@ -1958,10 +1118,6 @@ export type UserFindFirstOrThrowArgs<ExtArgs extends runtime.Types.Extensions.In
    */
   omit?: Prisma.UserOmit<ExtArgs> | null
   /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.UserInclude<ExtArgs> | null
-  /**
    * Filter, which User to fetch.
    */
   where?: Prisma.UserWhereInput
@@ -2011,10 +1167,6 @@ export type UserFindManyArgs<ExtArgs extends runtime.Types.Extensions.InternalAr
    */
   omit?: Prisma.UserOmit<ExtArgs> | null
   /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.UserInclude<ExtArgs> | null
-  /**
    * Filter, which Users to fetch.
    */
   where?: Prisma.UserWhereInput
@@ -2058,10 +1210,6 @@ export type UserCreateArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs
    * Omit specific fields from the User
    */
   omit?: Prisma.UserOmit<ExtArgs> | null
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.UserInclude<ExtArgs> | null
   /**
    * The data needed to create a User.
    */
@@ -2111,10 +1259,6 @@ export type UserUpdateArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs
    * Omit specific fields from the User
    */
   omit?: Prisma.UserOmit<ExtArgs> | null
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.UserInclude<ExtArgs> | null
   /**
    * The data needed to update a User.
    */
@@ -2183,10 +1327,6 @@ export type UserUpsertArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs
    */
   omit?: Prisma.UserOmit<ExtArgs> | null
   /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.UserInclude<ExtArgs> | null
-  /**
    * The filter to search for the User to update in case it exists.
    */
   where: Prisma.UserWhereUniqueInput
@@ -2214,10 +1354,6 @@ export type UserDeleteArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs
    */
   omit?: Prisma.UserOmit<ExtArgs> | null
   /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.UserInclude<ExtArgs> | null
-  /**
    * Filter which User to delete.
    */
   where: Prisma.UserWhereUniqueInput
@@ -2239,150 +1375,6 @@ export type UserDeleteManyArgs<ExtArgs extends runtime.Types.Extensions.Internal
 }
 
 /**
- * User.ConversationParticipant
- */
-export type User$ConversationParticipantArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the ConversationParticipant
-   */
-  select?: Prisma.ConversationParticipantSelect<ExtArgs> | null
-  /**
-   * Omit specific fields from the ConversationParticipant
-   */
-  omit?: Prisma.ConversationParticipantOmit<ExtArgs> | null
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.ConversationParticipantInclude<ExtArgs> | null
-  where?: Prisma.ConversationParticipantWhereInput
-  orderBy?: Prisma.ConversationParticipantOrderByWithRelationInput | Prisma.ConversationParticipantOrderByWithRelationInput[]
-  cursor?: Prisma.ConversationParticipantWhereUniqueInput
-  take?: number
-  skip?: number
-  distinct?: Prisma.ConversationParticipantScalarFieldEnum | Prisma.ConversationParticipantScalarFieldEnum[]
-}
-
-/**
- * User.FriendRequest_FriendRequest_receiverIdToUser
- */
-export type User$FriendRequest_FriendRequest_receiverIdToUserArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the FriendRequest
-   */
-  select?: Prisma.FriendRequestSelect<ExtArgs> | null
-  /**
-   * Omit specific fields from the FriendRequest
-   */
-  omit?: Prisma.FriendRequestOmit<ExtArgs> | null
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.FriendRequestInclude<ExtArgs> | null
-  where?: Prisma.FriendRequestWhereInput
-  orderBy?: Prisma.FriendRequestOrderByWithRelationInput | Prisma.FriendRequestOrderByWithRelationInput[]
-  cursor?: Prisma.FriendRequestWhereUniqueInput
-  take?: number
-  skip?: number
-  distinct?: Prisma.FriendRequestScalarFieldEnum | Prisma.FriendRequestScalarFieldEnum[]
-}
-
-/**
- * User.FriendRequest_FriendRequest_senderIdToUser
- */
-export type User$FriendRequest_FriendRequest_senderIdToUserArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the FriendRequest
-   */
-  select?: Prisma.FriendRequestSelect<ExtArgs> | null
-  /**
-   * Omit specific fields from the FriendRequest
-   */
-  omit?: Prisma.FriendRequestOmit<ExtArgs> | null
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.FriendRequestInclude<ExtArgs> | null
-  where?: Prisma.FriendRequestWhereInput
-  orderBy?: Prisma.FriendRequestOrderByWithRelationInput | Prisma.FriendRequestOrderByWithRelationInput[]
-  cursor?: Prisma.FriendRequestWhereUniqueInput
-  take?: number
-  skip?: number
-  distinct?: Prisma.FriendRequestScalarFieldEnum | Prisma.FriendRequestScalarFieldEnum[]
-}
-
-/**
- * User.Message
- */
-export type User$MessageArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the Message
-   */
-  select?: Prisma.MessageSelect<ExtArgs> | null
-  /**
-   * Omit specific fields from the Message
-   */
-  omit?: Prisma.MessageOmit<ExtArgs> | null
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.MessageInclude<ExtArgs> | null
-  where?: Prisma.MessageWhereInput
-  orderBy?: Prisma.MessageOrderByWithRelationInput | Prisma.MessageOrderByWithRelationInput[]
-  cursor?: Prisma.MessageWhereUniqueInput
-  take?: number
-  skip?: number
-  distinct?: Prisma.MessageScalarFieldEnum | Prisma.MessageScalarFieldEnum[]
-}
-
-/**
- * User.Reaction
- */
-export type User$ReactionArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the Reaction
-   */
-  select?: Prisma.ReactionSelect<ExtArgs> | null
-  /**
-   * Omit specific fields from the Reaction
-   */
-  omit?: Prisma.ReactionOmit<ExtArgs> | null
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.ReactionInclude<ExtArgs> | null
-  where?: Prisma.ReactionWhereInput
-  orderBy?: Prisma.ReactionOrderByWithRelationInput | Prisma.ReactionOrderByWithRelationInput[]
-  cursor?: Prisma.ReactionWhereUniqueInput
-  take?: number
-  skip?: number
-  distinct?: Prisma.ReactionScalarFieldEnum | Prisma.ReactionScalarFieldEnum[]
-}
-
-/**
- * User.ReadReceipt
- */
-export type User$ReadReceiptArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the ReadReceipt
-   */
-  select?: Prisma.ReadReceiptSelect<ExtArgs> | null
-  /**
-   * Omit specific fields from the ReadReceipt
-   */
-  omit?: Prisma.ReadReceiptOmit<ExtArgs> | null
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.ReadReceiptInclude<ExtArgs> | null
-  where?: Prisma.ReadReceiptWhereInput
-  orderBy?: Prisma.ReadReceiptOrderByWithRelationInput | Prisma.ReadReceiptOrderByWithRelationInput[]
-  cursor?: Prisma.ReadReceiptWhereUniqueInput
-  take?: number
-  skip?: number
-  distinct?: Prisma.ReadReceiptScalarFieldEnum | Prisma.ReadReceiptScalarFieldEnum[]
-}
-
-/**
  * User without action
  */
 export type UserDefaultArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -2394,8 +1386,4 @@ export type UserDefaultArgs<ExtArgs extends runtime.Types.Extensions.InternalArg
    * Omit specific fields from the User
    */
   omit?: Prisma.UserOmit<ExtArgs> | null
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.UserInclude<ExtArgs> | null
 }

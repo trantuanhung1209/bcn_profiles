@@ -51,14 +51,7 @@ export const AnyNull = runtime.AnyNull
 
 
 export const ModelName = {
-  Attachment: 'Attachment',
-  Conversation: 'Conversation',
-  ConversationParticipant: 'ConversationParticipant',
-  FriendRequest: 'FriendRequest',
-  Message: 'Message',
   PasswordReset: 'PasswordReset',
-  Reaction: 'Reaction',
-  ReadReceipt: 'ReadReceipt',
   TokenBlacklist: 'TokenBlacklist',
   User: 'User'
 } as const
@@ -79,85 +72,6 @@ export const TransactionIsolationLevel = runtime.makeStrictEnum({
 export type TransactionIsolationLevel = (typeof TransactionIsolationLevel)[keyof typeof TransactionIsolationLevel]
 
 
-export const AttachmentScalarFieldEnum = {
-  id: 'id',
-  messageId: 'messageId',
-  filename: 'filename',
-  url: 'url',
-  fileType: 'fileType',
-  fileSize: 'fileSize',
-  createdAt: 'createdAt'
-} as const
-
-export type AttachmentScalarFieldEnum = (typeof AttachmentScalarFieldEnum)[keyof typeof AttachmentScalarFieldEnum]
-
-
-export const RelationLoadStrategy = {
-  query: 'query',
-  join: 'join'
-} as const
-
-export type RelationLoadStrategy = (typeof RelationLoadStrategy)[keyof typeof RelationLoadStrategy]
-
-
-export const ConversationScalarFieldEnum = {
-  id: 'id',
-  name: 'name',
-  avatar: 'avatar',
-  isGroup: 'isGroup',
-  createdBy: 'createdBy',
-  createdAt: 'createdAt',
-  updatedAt: 'updatedAt',
-  lastMessageAt: 'lastMessageAt'
-} as const
-
-export type ConversationScalarFieldEnum = (typeof ConversationScalarFieldEnum)[keyof typeof ConversationScalarFieldEnum]
-
-
-export const ConversationParticipantScalarFieldEnum = {
-  id: 'id',
-  conversationId: 'conversationId',
-  userId: 'userId',
-  joinedAt: 'joinedAt',
-  leftAt: 'leftAt',
-  role: 'role',
-  lastReadAt: 'lastReadAt'
-} as const
-
-export type ConversationParticipantScalarFieldEnum = (typeof ConversationParticipantScalarFieldEnum)[keyof typeof ConversationParticipantScalarFieldEnum]
-
-
-export const FriendRequestScalarFieldEnum = {
-  id: 'id',
-  senderId: 'senderId',
-  receiverId: 'receiverId',
-  status: 'status',
-  createdAt: 'createdAt',
-  updatedAt: 'updatedAt'
-} as const
-
-export type FriendRequestScalarFieldEnum = (typeof FriendRequestScalarFieldEnum)[keyof typeof FriendRequestScalarFieldEnum]
-
-
-export const MessageScalarFieldEnum = {
-  id: 'id',
-  conversationId: 'conversationId',
-  senderId: 'senderId',
-  content: 'content',
-  type: 'type',
-  createdAt: 'createdAt',
-  updatedAt: 'updatedAt',
-  isEdited: 'isEdited',
-  deletedAt: 'deletedAt',
-  replyToId: 'replyToId',
-  isPinned: 'isPinned',
-  pinnedAt: 'pinnedAt',
-  pinnedBy: 'pinnedBy'
-} as const
-
-export type MessageScalarFieldEnum = (typeof MessageScalarFieldEnum)[keyof typeof MessageScalarFieldEnum]
-
-
 export const PasswordResetScalarFieldEnum = {
   id: 'id',
   email: 'email',
@@ -170,25 +84,12 @@ export const PasswordResetScalarFieldEnum = {
 export type PasswordResetScalarFieldEnum = (typeof PasswordResetScalarFieldEnum)[keyof typeof PasswordResetScalarFieldEnum]
 
 
-export const ReactionScalarFieldEnum = {
-  id: 'id',
-  messageId: 'messageId',
-  userId: 'userId',
-  emoji: 'emoji',
-  createdAt: 'createdAt'
+export const RelationLoadStrategy = {
+  query: 'query',
+  join: 'join'
 } as const
 
-export type ReactionScalarFieldEnum = (typeof ReactionScalarFieldEnum)[keyof typeof ReactionScalarFieldEnum]
-
-
-export const ReadReceiptScalarFieldEnum = {
-  id: 'id',
-  messageId: 'messageId',
-  userId: 'userId',
-  readAt: 'readAt'
-} as const
-
-export type ReadReceiptScalarFieldEnum = (typeof ReadReceiptScalarFieldEnum)[keyof typeof ReadReceiptScalarFieldEnum]
+export type RelationLoadStrategy = (typeof RelationLoadStrategy)[keyof typeof RelationLoadStrategy]
 
 
 export const TokenBlacklistScalarFieldEnum = {

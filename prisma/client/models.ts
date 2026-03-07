@@ -8,14 +8,7 @@
  *
  * 🟢 You can import this file directly.
  */
-export type * from './models/Attachment.js'
-export type * from './models/Conversation.js'
-export type * from './models/ConversationParticipant.js'
-export type * from './models/FriendRequest.js'
-export type * from './models/Message.js'
 export type * from './models/PasswordReset.js'
-export type * from './models/Reaction.js'
-export type * from './models/ReadReceipt.js'
 export type * from './models/TokenBlacklist.js'
 export type * from './models/User.js'
 export type * from './commonInputTypes.js'

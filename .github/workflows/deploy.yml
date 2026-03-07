@@ -9,7 +9,7 @@ jobs:
     steps:
       - name: Trigger webhook to deploy
         run: |
-          curl -X POST https://bancongnghe.tech/deploy \
+          curl -X POST https://profile.uside.studio/deploy \
             -H "Content-Type: application/json" \
             -H "X-DEPLOY-TOKEN: ${{ secrets.DEPLOY_TOKEN }}" \
             -d '{

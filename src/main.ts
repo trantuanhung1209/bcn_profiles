@@ -2,13 +2,15 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
+import helmet from 'helmet';
 const cookieParser = require('cookie-parser');
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  
-  // Enable graceful shutdown
-  
+
+  // Bảo mật HTTP headers
+  app.use(helmet());
+
   // Sử dụng cookie-parser
   app.use(cookieParser());
   

@@ -9,7 +9,7 @@ export class AppService {
 
   getHello(): string {
     this.logger.log('getHello() called');
-    return 'Hello New Chat App With NestJS!';
+    return 'Hello Chat App With NestJS!';
   }
 
   async checkDatabaseConnection() {

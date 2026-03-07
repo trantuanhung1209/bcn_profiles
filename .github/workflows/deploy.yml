@@ -1,0 +1,35 @@
+name: Trigger Deploy
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger webhook to deploy
+        run: |
+          curl -X POST https://bancongnghe.tech/deploy \
+            -H "Content-Type: application/json" \
+            -H "X-DEPLOY-TOKEN: ${{ secrets.DEPLOY_TOKEN }}" \
+            -d '{
+              "trigger": "github",
+              "DATABASE_URL": "${{ secrets.DATABASE_URL }}",
+              "DB_USER": "${{ secrets.DB_USER }}",
+              "DB_HOST": "${{ secrets.DB_HOST }}",
+              "DB_NAME": "${{ secrets.DB_NAME }}",
+              "DB_PASSWORD": "${{ secrets.DB_PASSWORD }}",
+              "DB_PORT": "${{ secrets.DB_PORT }}",
+              "JWT_SECRET": "${{ secrets.JWT_SECRET }}",
+              "JWT_REFRESH_SECRET": "${{ secrets.JWT_REFRESH_SECRET }}",
+              "APP_URL": "${{ secrets.APP_URL }}",
+              "GOOGLE_CLIENT_ID": "${{ secrets.GOOGLE_CLIENT_ID }}",
+              "GOOGLE_CLIENT_SECRET": "${{ secrets.GOOGLE_CLIENT_SECRET }}",
+              "POSTGRES_DB": "${{ secrets.POSTGRES_DB }}",
+              "POSTGRES_USER": "${{ secrets.POSTGRES_USER }}",
+              "POSTGRES_PASSWORD": "${{ secrets.POSTGRES_PASSWORD }}",
+              "PGADMIN_EMAIL": "${{ secrets.PGADMIN_EMAIL }}",
+              "PGADMIN_PASSWORD": "${{ secrets.PGADMIN_PASSWORD }}",
+              "EMAIL_USER": "${{ secrets.EMAIL_USER }}",
+              "EMAIL_PASSWORD": "${{ secrets.EMAIL_PASSWORD }}"
+            }'

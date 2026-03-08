@@ -12,12 +12,15 @@ export class EmailService {
   constructor(private configService: ConfigService) {
     // Cấu hình transporter với thông tin từ .env
     this.transporter = nodemailer.createTransport({
-      service: 'gmail', // Hoặc 'smtp' nếu dùng SMTP khác
+      host: 'smtp.gmail.com',
+      port: 465,
+      secure: true,
+      family: 4, // Force IPv4 to avoid ENETUNREACH on IPv6
       auth: {
         user: this.configService.get<string>('EMAIL_USER'),
         pass: this.configService.get<string>('EMAIL_PASSWORD'),
       },
-    });
+    } as any);
   }
 
   /**

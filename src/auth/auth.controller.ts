@@ -108,6 +108,7 @@ export class AuthController {
   }
 
   @Public()
+  @Throttle({ default: { ttl: 60000, limit: 10 } })
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   async refresh(@Res({ passthrough: true }) response: Response) {
@@ -143,6 +144,7 @@ export class AuthController {
   }
 
   @Public()
+  @Throttle({ default: { ttl: 60000, limit: 3 } })
   @Post('forgot-password')
   @HttpCode(HttpStatus.OK)
   async forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
@@ -150,12 +152,14 @@ export class AuthController {
   }
 
   @Public()
+  @Throttle({ default: { ttl: 60000, limit: 5 } })
   @Post('reset-password')
   @HttpCode(HttpStatus.OK)
   async resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
     return this.authService.resetPassword(resetPasswordDto);
   }
 
+  @Throttle({ default: { ttl: 900000, limit: 3 } })
   @Post('change-email/request')
   @HttpCode(HttpStatus.OK)
   async requestEmailChange(
@@ -165,6 +169,7 @@ export class AuthController {
     return this.authService.requestEmailChange(user.id, dto);
   }
 
+  @Throttle({ default: { ttl: 900000, limit: 5 } })
   @Post('change-email/confirm')
   @HttpCode(HttpStatus.OK)
   async confirmEmailChange(

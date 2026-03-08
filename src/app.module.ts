@@ -2,6 +2,7 @@ import { MiddlewareConsumer, Module, RequestMethod } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { ScheduleModule } from '@nestjs/schedule';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { CatsModule } from './cats/cats.module';
@@ -18,7 +19,14 @@ import { RolesGuard } from './auth/guards/roles.guard';
       isGlobal: true,
       envFilePath: process.env.NODE_ENV === 'production' ? '.env.production' : '.env',
     }),
-    ScheduleModule.forRoot(), // Enable scheduled tasks
+    ThrottlerModule.forRoot([
+      {
+        name: 'default',
+        ttl: 60000,   // 1 phút
+        limit: 60,    // 60 request/phút (mặc định toàn app)
+      },
+    ]),
+    ScheduleModule.forRoot(),
     CatsModule,
     PrismaModule,
     UsersModule,
@@ -29,11 +37,15 @@ import { RolesGuard } from './auth/guards/roles.guard';
     AppService,
     {
       provide: APP_GUARD,
-      useClass: JwtAuthGuard, // Áp dụng JwtAuthGuard cho toàn bộ ứng dụng
+      useClass: JwtAuthGuard,
     },
     {
       provide: APP_GUARD,
-      useClass: RolesGuard, // Áp dụng RolesGuard cho toàn bộ ứng dụng
+      useClass: RolesGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
     },
   ],
 })

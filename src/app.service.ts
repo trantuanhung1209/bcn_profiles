@@ -18,7 +18,7 @@ export class AppService {
       await this.prisma.$queryRaw`SELECT 1`;
       return {
         status: 'success',
-        message: 'Đã kết nối với Prisma và database thành công!',
+        message: 'Đã kết nối với Prisma, database thành công!',
         timestamp: new Date().toISOString(),
         database: 'connected'
       };

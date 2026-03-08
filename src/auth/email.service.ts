@@ -13,12 +13,15 @@ export class EmailService {
     // Cấu hình transporter với thông tin từ .env
     this.transporter = nodemailer.createTransport({
       host: 'smtp.gmail.com',
-      port: 465,
-      secure: true,
+      port: 587,
+      secure: false, // STARTTLS
       family: 4, // Force IPv4 to avoid ENETUNREACH on IPv6
       auth: {
         user: this.configService.get<string>('EMAIL_USER'),
         pass: this.configService.get<string>('EMAIL_PASSWORD'),
+      },
+      tls: {
+        rejectUnauthorized: false,
       },
     } as any);
   }

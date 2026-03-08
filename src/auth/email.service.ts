@@ -59,9 +59,9 @@ export class EmailService {
     });
 
     const mailOptions = {
-      from: `"Chat App Support" <${this.configService.get<string>('EMAIL_USER')}>`,
+      from: `"BCN Support" <${this.configService.get<string>('EMAIL_USER')}>`,
       to: email,
-      subject: 'Đặt lại mật khẩu - Chat App',
+      subject: 'Đặt lại mật khẩu - BCN Profiles',
       html,
     };
 

@@ -27,6 +27,7 @@ export class UsersController {
   }
 
   @Get('count')
+  @Roles(Role.ADMIN)
   async countUsers() {
     const count = await this.usersService.countUsers();
     return {
@@ -35,6 +36,7 @@ export class UsersController {
   }
 
   @Get('email')
+  @Roles(Role.ADMIN)
   async findByEmail(@Query('email') email: string) {
     const user = await this.usersService.findByEmail(email);
     if (!user) {
@@ -74,10 +76,13 @@ export class UsersController {
     };
   }
 
-  @Patch(':id')
+  @Patch('me')
   @Roles(Role.USER)
-  async updateUser(@Param('id') id: string, @Body() updateData: UpdateUserDto) {
-    const updatedUser = await this.usersService.updateUser(id, updateData);
+  async updateUser(
+    @Body() updateData: UpdateUserDto,
+    @User() currentUser: any,
+  ) {
+    const updatedUser = await this.usersService.updateUser(currentUser.id, updateData);
     return {
       users: updatedUser,
     };

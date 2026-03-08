@@ -22,7 +22,10 @@ async function bootstrap() {
   );
   app.useGlobalInterceptors(new ResponseInterceptor());
 
-  app.enableCors();
+  app.enableCors({
+    origin: /^https?:\/\/[^.]+\.uside\.studio$/,
+    credentials: true,
+  });
   
   await app.listen(3000);
   console.log(`🚀 Application is running on: http://localhost:3000`);

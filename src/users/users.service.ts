@@ -208,7 +208,7 @@ export class UsersService {
     // Tạo user mới
     const newUser = await this.prisma.user.create({
       data: {
-        id: randomUUID(),
+        id: `BCN_${randomUUID()}`,
         email,
         password: hashedPassword,
         fullName,

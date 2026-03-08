@@ -38,9 +38,8 @@ model User {
   role      String       @default("USER")
   googleId  String?      @unique
   typeAuth  authProvider @default(EMAIL)
-  bio       String?
-  isOnline  Boolean      @default(false)
-  lastSeen  DateTime?
+  metadata  Json?
+  phone     String?      @unique
 }
 
 enum authProvider {

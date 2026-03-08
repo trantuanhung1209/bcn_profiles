@@ -27,7 +27,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       secretOrKey: configService.get<string>('JWT_SECRET') || 'your-secret-key',
       passReqToCallback: true, // Để có thể access request trong validate()
     });
-    console.log('🔐 JWT Strategy initialized with secret:', this.configService.get<string>('JWT_SECRET'));
   }
 
   async validate(request: Request, payload: any) {
@@ -67,10 +66,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       }
 
       // Return user với role để RolesGuard có thể check
-      return { 
-        userId: payload.sub,
-        ...user 
-      };
+      return user;
     } catch (error) {
       console.error('❌ Validation error:', error);
       throw error;

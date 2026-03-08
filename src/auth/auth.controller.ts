@@ -20,6 +20,8 @@ import { ResetPasswordDto } from './dto/reset-password.dto';
 import { Public } from './decorators/public.decorator';
 import { TokenBlacklistService } from './token-blacklist.service';
 import { Throttle, SkipThrottle } from '@nestjs/throttler';
+import { RequestEmailChangeDto } from './dto/request-email-change.dto';
+import { ConfirmEmailChangeDto } from './dto/confirm-email-change.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -64,13 +66,12 @@ export class AuthController {
 
     return {
       message: 'Đăng nhập thành công',
-      user: result.user,
     };
   }
 
   @Get('profile')
-  async getProfile(@User('userId') userId: string) {
-    return this.authService.getProfile(userId);
+  async getProfile(@User('id') ID: string) {
+    return this.authService.getProfile(ID);
   }
 
   @Get('me')
@@ -153,6 +154,24 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
     return this.authService.resetPassword(resetPasswordDto);
+  }
+
+  @Post('change-email/request')
+  @HttpCode(HttpStatus.OK)
+  async requestEmailChange(
+    @User() user: any,
+    @Body() dto: RequestEmailChangeDto,
+  ) {
+    return this.authService.requestEmailChange(user.id, dto);
+  }
+
+  @Post('change-email/confirm')
+  @HttpCode(HttpStatus.OK)
+  async confirmEmailChange(
+    @User() user: any,
+    @Body() dto: ConfirmEmailChangeDto,
+  ) {
+    return this.authService.confirmEmailChange(user.id, dto);
   }
 
   @Public()

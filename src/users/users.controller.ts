@@ -11,7 +11,14 @@ import { User } from '../auth/decorators/user.decorator';
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
+  @Get('search')
+  async searchUsers(@Query('q') q: string) {
+    const results = await this.usersService.searchUsers(q);
+    return { users: results };
+  }
+
   @Get()
+  @Roles(Role.ADMIN)
   async findAll(@Query() query: QueryUsersDto) {
     const { page, limit, sort, order, search } = query;
     const result = await this.usersService.findAll(

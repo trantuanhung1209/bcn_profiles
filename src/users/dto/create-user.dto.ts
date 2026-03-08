@@ -1,4 +1,6 @@
-import { IsEmail, IsNotEmpty, IsOptional, IsString, MinLength, Matches } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsOptional, IsString, MinLength, Matches, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
+import { UserMetadataDto } from './user-metadata.dto';
 
 export class CreateUserDto {
   @IsEmail({}, { message: 'Email không hợp lệ' })
@@ -22,6 +24,11 @@ export class CreateUserDto {
   avatar?: string;
 
   @IsOptional()
-  @IsString({ message: 'Bio phải là chuỗi' })
-  bio?: string;
+  @IsString({ message: 'Số điện thoại phải là chuỗi' })
+  phone?: string;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => UserMetadataDto)
+  metadata?: UserMetadataDto;
 }

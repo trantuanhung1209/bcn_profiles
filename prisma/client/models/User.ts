@@ -35,9 +35,7 @@ export type UserMinAggregateOutputType = {
   role: string | null
   googleId: string | null
   typeAuth: $Enums.authProvider | null
-  bio: string | null
-  isOnline: boolean | null
-  lastSeen: Date | null
+  phone: string | null
 }
 
 export type UserMaxAggregateOutputType = {
@@ -51,9 +49,7 @@ export type UserMaxAggregateOutputType = {
   role: string | null
   googleId: string | null
   typeAuth: $Enums.authProvider | null
-  bio: string | null
-  isOnline: boolean | null
-  lastSeen: Date | null
+  phone: string | null
 }
 
 export type UserCountAggregateOutputType = {
@@ -67,9 +63,8 @@ export type UserCountAggregateOutputType = {
   role: number
   googleId: number
   typeAuth: number
-  bio: number
-  isOnline: number
-  lastSeen: number
+  metadata: number
+  phone: number
   _all: number
 }
 
@@ -85,9 +80,7 @@ export type UserMinAggregateInputType = {
   role?: true
   googleId?: true
   typeAuth?: true
-  bio?: true
-  isOnline?: true
-  lastSeen?: true
+  phone?: true
 }
 
 export type UserMaxAggregateInputType = {
@@ -101,9 +94,7 @@ export type UserMaxAggregateInputType = {
   role?: true
   googleId?: true
   typeAuth?: true
-  bio?: true
-  isOnline?: true
-  lastSeen?: true
+  phone?: true
 }
 
 export type UserCountAggregateInputType = {
@@ -117,9 +108,8 @@ export type UserCountAggregateInputType = {
   role?: true
   googleId?: true
   typeAuth?: true
-  bio?: true
-  isOnline?: true
-  lastSeen?: true
+  metadata?: true
+  phone?: true
   _all?: true
 }
 
@@ -206,9 +196,8 @@ export type UserGroupByOutputType = {
   role: string
   googleId: string | null
   typeAuth: $Enums.authProvider
-  bio: string | null
-  isOnline: boolean
-  lastSeen: Date | null
+  metadata: runtime.JsonValue | null
+  phone: string | null
   _count: UserCountAggregateOutputType | null
   _min: UserMinAggregateOutputType | null
   _max: UserMaxAggregateOutputType | null
@@ -243,9 +232,8 @@ export type UserWhereInput = {
   role?: Prisma.StringFilter<"User"> | string
   googleId?: Prisma.StringNullableFilter<"User"> | string | null
   typeAuth?: Prisma.EnumauthProviderFilter<"User"> | $Enums.authProvider
-  bio?: Prisma.StringNullableFilter<"User"> | string | null
-  isOnline?: Prisma.BoolFilter<"User"> | boolean
-  lastSeen?: Prisma.DateTimeNullableFilter<"User"> | Date | string | null
+  metadata?: Prisma.JsonNullableFilter<"User">
+  phone?: Prisma.StringNullableFilter<"User"> | string | null
 }
 
 export type UserOrderByWithRelationInput = {
@@ -259,15 +247,15 @@ export type UserOrderByWithRelationInput = {
   role?: Prisma.SortOrder
   googleId?: Prisma.SortOrderInput | Prisma.SortOrder
   typeAuth?: Prisma.SortOrder
-  bio?: Prisma.SortOrderInput | Prisma.SortOrder
-  isOnline?: Prisma.SortOrder
-  lastSeen?: Prisma.SortOrderInput | Prisma.SortOrder
+  metadata?: Prisma.SortOrderInput | Prisma.SortOrder
+  phone?: Prisma.SortOrderInput | Prisma.SortOrder
 }
 
 export type UserWhereUniqueInput = Prisma.AtLeast<{
   id?: string
   email?: string
   googleId?: string
+  phone?: string
   AND?: Prisma.UserWhereInput | Prisma.UserWhereInput[]
   OR?: Prisma.UserWhereInput[]
   NOT?: Prisma.UserWhereInput | Prisma.UserWhereInput[]
@@ -278,10 +266,8 @@ export type UserWhereUniqueInput = Prisma.AtLeast<{
   updatedAt?: Prisma.DateTimeFilter<"User"> | Date | string
   role?: Prisma.StringFilter<"User"> | string
   typeAuth?: Prisma.EnumauthProviderFilter<"User"> | $Enums.authProvider
-  bio?: Prisma.StringNullableFilter<"User"> | string | null
-  isOnline?: Prisma.BoolFilter<"User"> | boolean
-  lastSeen?: Prisma.DateTimeNullableFilter<"User"> | Date | string | null
-}, "id" | "email" | "googleId">
+  metadata?: Prisma.JsonNullableFilter<"User">
+}, "id" | "email" | "googleId" | "phone">
 
 export type UserOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
@@ -294,9 +280,8 @@ export type UserOrderByWithAggregationInput = {
   role?: Prisma.SortOrder
   googleId?: Prisma.SortOrderInput | Prisma.SortOrder
   typeAuth?: Prisma.SortOrder
-  bio?: Prisma.SortOrderInput | Prisma.SortOrder
-  isOnline?: Prisma.SortOrder
-  lastSeen?: Prisma.SortOrderInput | Prisma.SortOrder
+  metadata?: Prisma.SortOrderInput | Prisma.SortOrder
+  phone?: Prisma.SortOrderInput | Prisma.SortOrder
   _count?: Prisma.UserCountOrderByAggregateInput
   _max?: Prisma.UserMaxOrderByAggregateInput
   _min?: Prisma.UserMinOrderByAggregateInput
@@ -316,9 +301,8 @@ export type UserScalarWhereWithAggregatesInput = {
   role?: Prisma.StringWithAggregatesFilter<"User"> | string
   googleId?: Prisma.StringNullableWithAggregatesFilter<"User"> | string | null
   typeAuth?: Prisma.EnumauthProviderWithAggregatesFilter<"User"> | $Enums.authProvider
-  bio?: Prisma.StringNullableWithAggregatesFilter<"User"> | string | null
-  isOnline?: Prisma.BoolWithAggregatesFilter<"User"> | boolean
-  lastSeen?: Prisma.DateTimeNullableWithAggregatesFilter<"User"> | Date | string | null
+  metadata?: Prisma.JsonNullableWithAggregatesFilter<"User">
+  phone?: Prisma.StringNullableWithAggregatesFilter<"User"> | string | null
 }
 
 export type UserCreateInput = {
@@ -332,9 +316,8 @@ export type UserCreateInput = {
   role?: string
   googleId?: string | null
   typeAuth?: $Enums.authProvider
-  bio?: string | null
-  isOnline?: boolean
-  lastSeen?: Date | string | null
+  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  phone?: string | null
 }
 
 export type UserUncheckedCreateInput = {
@@ -348,9 +331,8 @@ export type UserUncheckedCreateInput = {
   role?: string
   googleId?: string | null
   typeAuth?: $Enums.authProvider
-  bio?: string | null
-  isOnline?: boolean
-  lastSeen?: Date | string | null
+  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  phone?: string | null
 }
 
 export type UserUpdateInput = {
@@ -364,9 +346,8 @@ export type UserUpdateInput = {
   role?: Prisma.StringFieldUpdateOperationsInput | string
   googleId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   typeAuth?: Prisma.EnumauthProviderFieldUpdateOperationsInput | $Enums.authProvider
-  bio?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  isOnline?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  lastSeen?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  phone?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
 }
 
 export type UserUncheckedUpdateInput = {
@@ -380,9 +361,8 @@ export type UserUncheckedUpdateInput = {
   role?: Prisma.StringFieldUpdateOperationsInput | string
   googleId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   typeAuth?: Prisma.EnumauthProviderFieldUpdateOperationsInput | $Enums.authProvider
-  bio?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  isOnline?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  lastSeen?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  phone?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
 }
 
 export type UserCreateManyInput = {
@@ -396,9 +376,8 @@ export type UserCreateManyInput = {
   role?: string
   googleId?: string | null
   typeAuth?: $Enums.authProvider
-  bio?: string | null
-  isOnline?: boolean
-  lastSeen?: Date | string | null
+  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  phone?: string | null
 }
 
 export type UserUpdateManyMutationInput = {
@@ -412,9 +391,8 @@ export type UserUpdateManyMutationInput = {
   role?: Prisma.StringFieldUpdateOperationsInput | string
   googleId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   typeAuth?: Prisma.EnumauthProviderFieldUpdateOperationsInput | $Enums.authProvider
-  bio?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  isOnline?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  lastSeen?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  phone?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
 }
 
 export type UserUncheckedUpdateManyInput = {
@@ -428,9 +406,8 @@ export type UserUncheckedUpdateManyInput = {
   role?: Prisma.StringFieldUpdateOperationsInput | string
   googleId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   typeAuth?: Prisma.EnumauthProviderFieldUpdateOperationsInput | $Enums.authProvider
-  bio?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  isOnline?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  lastSeen?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  phone?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
 }
 
 export type UserCountOrderByAggregateInput = {
@@ -444,9 +421,8 @@ export type UserCountOrderByAggregateInput = {
   role?: Prisma.SortOrder
   googleId?: Prisma.SortOrder
   typeAuth?: Prisma.SortOrder
-  bio?: Prisma.SortOrder
-  isOnline?: Prisma.SortOrder
-  lastSeen?: Prisma.SortOrder
+  metadata?: Prisma.SortOrder
+  phone?: Prisma.SortOrder
 }
 
 export type UserMaxOrderByAggregateInput = {
@@ -460,9 +436,7 @@ export type UserMaxOrderByAggregateInput = {
   role?: Prisma.SortOrder
   googleId?: Prisma.SortOrder
   typeAuth?: Prisma.SortOrder
-  bio?: Prisma.SortOrder
-  isOnline?: Prisma.SortOrder
-  lastSeen?: Prisma.SortOrder
+  phone?: Prisma.SortOrder
 }
 
 export type UserMinOrderByAggregateInput = {
@@ -476,9 +450,7 @@ export type UserMinOrderByAggregateInput = {
   role?: Prisma.SortOrder
   googleId?: Prisma.SortOrder
   typeAuth?: Prisma.SortOrder
-  bio?: Prisma.SortOrder
-  isOnline?: Prisma.SortOrder
-  lastSeen?: Prisma.SortOrder
+  phone?: Prisma.SortOrder
 }
 
 export type NullableStringFieldUpdateOperationsInput = {
@@ -487,10 +459,6 @@ export type NullableStringFieldUpdateOperationsInput = {
 
 export type EnumauthProviderFieldUpdateOperationsInput = {
   set?: $Enums.authProvider
-}
-
-export type NullableDateTimeFieldUpdateOperationsInput = {
-  set?: Date | string | null
 }
 
 
@@ -506,9 +474,8 @@ export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   role?: boolean
   googleId?: boolean
   typeAuth?: boolean
-  bio?: boolean
-  isOnline?: boolean
-  lastSeen?: boolean
+  metadata?: boolean
+  phone?: boolean
 }, ExtArgs["result"]["user"]>
 
 export type UserSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -522,9 +489,8 @@ export type UserSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensio
   role?: boolean
   googleId?: boolean
   typeAuth?: boolean
-  bio?: boolean
-  isOnline?: boolean
-  lastSeen?: boolean
+  metadata?: boolean
+  phone?: boolean
 }, ExtArgs["result"]["user"]>
 
 export type UserSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -538,9 +504,8 @@ export type UserSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensio
   role?: boolean
   googleId?: boolean
   typeAuth?: boolean
-  bio?: boolean
-  isOnline?: boolean
-  lastSeen?: boolean
+  metadata?: boolean
+  phone?: boolean
 }, ExtArgs["result"]["user"]>
 
 export type UserSelectScalar = {
@@ -554,12 +519,11 @@ export type UserSelectScalar = {
   role?: boolean
   googleId?: boolean
   typeAuth?: boolean
-  bio?: boolean
-  isOnline?: boolean
-  lastSeen?: boolean
+  metadata?: boolean
+  phone?: boolean
 }
 
-export type UserOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "email" | "password" | "fullName" | "avatar" | "createdAt" | "updatedAt" | "role" | "googleId" | "typeAuth" | "bio" | "isOnline" | "lastSeen", ExtArgs["result"]["user"]>
+export type UserOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "email" | "password" | "fullName" | "avatar" | "createdAt" | "updatedAt" | "role" | "googleId" | "typeAuth" | "metadata" | "phone", ExtArgs["result"]["user"]>
 
 export type $UserPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "User"
@@ -575,9 +539,8 @@ export type $UserPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
     role: string
     googleId: string | null
     typeAuth: $Enums.authProvider
-    bio: string | null
-    isOnline: boolean
-    lastSeen: Date | null
+    metadata: runtime.JsonValue | null
+    phone: string | null
   }, ExtArgs["result"]["user"]>
   composites: {}
 }
@@ -1011,9 +974,8 @@ export interface UserFieldRefs {
   readonly role: Prisma.FieldRef<"User", 'String'>
   readonly googleId: Prisma.FieldRef<"User", 'String'>
   readonly typeAuth: Prisma.FieldRef<"User", 'authProvider'>
-  readonly bio: Prisma.FieldRef<"User", 'String'>
-  readonly isOnline: Prisma.FieldRef<"User", 'Boolean'>
-  readonly lastSeen: Prisma.FieldRef<"User", 'DateTime'>
+  readonly metadata: Prisma.FieldRef<"User", 'Json'>
+  readonly phone: Prisma.FieldRef<"User", 'String'>
 }
     
 

@@ -54,9 +54,8 @@ export class UsersService {
           email: true,
           fullName: true,
           avatar: true,
-          bio: true,
-          isOnline: true,
-          lastSeen: true,
+          phone: true,
+          metadata: true,
           role: true,
           googleId: true,
           typeAuth: true,
@@ -111,9 +110,8 @@ export class UsersService {
           email: true,
           fullName: true,
           avatar: true,
-          bio: true,
-          isOnline: true,
-          lastSeen: true,
+          phone: true,
+          metadata: true,
           role: true,
           googleId: true,
           typeAuth: true,
@@ -145,9 +143,8 @@ export class UsersService {
         email: true,
         fullName: true,
         avatar: true,
-        bio: true,
-        isOnline: true,
-        lastSeen: true,
+        phone: true,
+        metadata: true,
         role: true,
         typeAuth: true,
         googleId: true,
@@ -172,9 +169,8 @@ export class UsersService {
         email: true,
         fullName: true,
         avatar: true,
-        bio: true,
-        isOnline: true,
-        lastSeen: true,
+        phone: true,
+        metadata: true,
         role: true,
         googleId: true,
         typeAuth: true,
@@ -190,7 +186,7 @@ export class UsersService {
   }
 
   async createUser(createUserDto: CreateUserDto): Promise<UserWithoutPassword> {
-    const { email, password, fullName, avatar, bio } = createUserDto;
+    const { email, password, fullName, avatar, phone, metadata } = createUserDto;
 
     // Kiểm tra email đã tồn tại chưa
     const existingUser = await this.prisma.user.findUnique({
@@ -213,7 +209,8 @@ export class UsersService {
         password: hashedPassword,
         fullName,
         avatar,
-        bio,
+        phone,
+        metadata: metadata ? (metadata as any) : {},
         createdAt: new Date(),
         updatedAt: new Date(),
       },
@@ -222,9 +219,8 @@ export class UsersService {
         email: true,
         fullName: true,
         avatar: true,
-        bio: true,
-        isOnline: true,
-        lastSeen: true,
+        phone: true,
+        metadata: true,
         role: true,
         googleId: true,
         typeAuth: true,
@@ -271,11 +267,14 @@ export class UsersService {
       throw new NotFoundException(`User với ID ${id} không tồn tại`);
     }
 
-    // Chỉ update các trường được phép: fullName, avatar, bio
+    // Chỉ update các trường được phép: fullName, avatar, metadata
     const updatedUser = await this.prisma.user.update({
       where: { id },
       data: {
-        ...updateUserDto,
+        fullName: updateUserDto.fullName,
+        avatar: updateUserDto.avatar,
+        phone: updateUserDto.phone,
+        ...(updateUserDto.metadata !== undefined && { metadata: updateUserDto.metadata as any }),
         updatedAt: new Date(),
       },
       select: {
@@ -283,9 +282,8 @@ export class UsersService {
         email: true,
         fullName: true,
         avatar: true,
-        bio: true,
-        isOnline: true,
-        lastSeen: true,
+        phone: true,
+        metadata: true,
         role: true,
         googleId: true,
         typeAuth: true,
@@ -296,5 +294,26 @@ export class UsersService {
     });
 
     return updatedUser;
+  }
+
+  async searchUsers(query: string): Promise<{ id: string; fullName: string | null; avatar: string | null; metadata: any }[]> {
+    if (!query || query.trim() === '') return [];
+
+    const allUsers = await this.prisma.user.findMany({
+      select: { id: true, fullName: true, email: true, avatar: true, metadata: true },
+    });
+
+    return allUsers
+      .filter((user) => {
+        const fullName = user.fullName || '';
+        const email = user.email || '';
+        return (
+          fullName.toLowerCase().includes(query.toLowerCase()) ||
+          email.toLowerCase().includes(query.toLowerCase()) ||
+          vietnameseIncludes(fullName, query) ||
+          vietnameseIncludes(email, query)
+        );
+      })
+      .map(({ id, fullName, avatar, metadata }) => ({ id, fullName, avatar, metadata }));
   }
 }

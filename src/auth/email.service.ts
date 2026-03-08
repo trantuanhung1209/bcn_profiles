@@ -72,4 +72,32 @@ export class EmailService {
       throw new Error('Không thể gửi email. Vui lòng thử lại sau.');
     }
   }
+
+  /**
+   * Gửi OTP xác nhận đổi email đến địa chỉ email mới
+   */
+  async sendChangeEmailOtp(newEmail: string, otp: string, fullName?: string): Promise<void> {
+    const mailOptions = {
+      from: `"BCN Support" <${this.configService.get<string>('EMAIL_USER')}>`,
+      to: newEmail,
+      subject: 'Xác nhận đổi email - BCN Profiles',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
+          <h2>Xác nhận đổi email</h2>
+          <p>Xin chào${fullName ? ` <b>${fullName}</b>` : ''},</p>
+          <p>Mã OTP xác nhận email mới của bạn là:</p>
+          <div style="font-size: 36px; font-weight: bold; letter-spacing: 10px; color: #4F46E5; margin: 24px 0;">${otp}</div>
+          <p>Mã có hiệu lực trong <b>15 phút</b>. Không chia sẻ mã này cho bất kỳ ai.</p>
+          <p>Nếu bạn không yêu cầu đổi email, hãy bỏ qua email này.</p>
+        </div>
+      `,
+    };
+
+    try {
+      await this.transporter.sendMail(mailOptions);
+    } catch (error) {
+      console.error('Error sending email:', error);
+      throw new Error('Không thể gửi email. Vui lòng thử lại sau.');
+    }
+  }
 }

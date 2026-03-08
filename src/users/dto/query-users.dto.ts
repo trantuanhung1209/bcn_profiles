@@ -15,7 +15,7 @@ export class QueryUsersDto {
   limit?: number = 10;
 
   @IsOptional()
-  @IsIn(['id', 'email', 'fullName', 'createdAt', 'updatedAt', 'role', 'isOnline', 'lastSeen'])
+  @IsIn(['id', 'email', 'fullName', 'createdAt', 'updatedAt', 'role'])
   sort?: string = 'createdAt';
 
   @IsOptional()

@@ -1,4 +1,6 @@
-import { IsOptional, IsString } from 'class-validator';
+import { IsObject, IsOptional, IsString, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
+import { UserMetadataDto } from './user-metadata.dto';
 
 export class UpdateUserDto {
   @IsOptional()
@@ -10,6 +12,12 @@ export class UpdateUserDto {
   avatar?: string;
 
   @IsOptional()
-  @IsString({ message: 'Bio phải là chuỗi' })
-  bio?: string;
+  @IsString({ message: 'Số điện thoại phải là chuỗi' })
+  phone?: string;
+
+  @IsOptional()
+  @IsObject()
+  @ValidateNested()
+  @Type(() => UserMetadataDto)
+  metadata?: UserMetadataDto;
 }

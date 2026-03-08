@@ -8,6 +8,8 @@ import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { EmailService } from './email.service';
 import { randomUUID } from 'crypto';
+import { RequestEmailChangeDto } from './dto/request-email-change.dto';
+import { ConfirmEmailChangeDto } from './dto/confirm-email-change.dto';
 
 @Injectable()
 export class AuthService {
@@ -40,7 +42,7 @@ export class AuthService {
   }
 
   async register(registerDto: RegisterDto) {
-    const { email, password, fullName, avatar } = registerDto;
+    const { email, password, fullName, avatar, phone } = registerDto;
 
     // Kiểm tra xem email đã tồn tại chưa
     const existingUser = await this.prisma.user.findUnique({
@@ -49,6 +51,15 @@ export class AuthService {
 
     if (existingUser) {
       throw new ConflictException('Email đã được sử dụng');
+    }
+
+    // Kiểm tra số điện thoại đã tồn tại chưa
+    const existingPhone = await this.prisma.user.findUnique({
+      where: { phone },
+    });
+
+    if (existingPhone) {
+      throw new ConflictException('Số điện thoại đã được sử dụng');
     }
 
     // Hash password
@@ -62,6 +73,7 @@ export class AuthService {
         fullName,
         password: hashedPassword,
         avatar,
+        phone,
         updatedAt: new Date(),
       },
       select: {
@@ -69,6 +81,7 @@ export class AuthService {
         email: true,
         fullName: true,
         avatar: true,
+        phone: true,
         createdAt: true,
       },
     });
@@ -155,9 +168,9 @@ export class AuthService {
     }
   }
 
-  async getProfile(userId: string) {
+  async getProfile(ID: string) {
     const user = await this.prisma.user.findUnique({
-      where: { id: userId },
+      where: { id: ID },
       select: {
         id: true,
         email: true,
@@ -174,6 +187,112 @@ export class AuthService {
     }
 
     return user;
+  }
+
+  /**
+   * Bước 1: Gửi OTP đến email mới để xác nhận đổi email
+   */
+  async requestEmailChange(userId: string, dto: RequestEmailChangeDto) {
+    const { newEmail } = dto;
+
+    const currentUser = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true, fullName: true },
+    });
+
+    if (!currentUser) {
+      throw new NotFoundException('Người dùng không tồn tại');
+    }
+
+    if (currentUser.email === newEmail) {
+      throw new BadRequestException('Email mới phải khác email hiện tại');
+    }
+
+    const emailTaken = await this.prisma.user.findUnique({
+      where: { email: newEmail },
+    });
+
+    if (emailTaken) {
+      throw new ConflictException('Email đã được sử dụng bởi tài khoản khác');
+    }
+
+    // Xóa OTP cũ chưa dùng (dùng key riêng để phân biệt với forgot-password)
+    await this.prisma.passwordReset.deleteMany({
+      where: { email: `change_email:${userId}:${newEmail}`, isUsed: false },
+    });
+
+    const otp = this.generateOTP();
+    const expiresAt = new Date();
+    expiresAt.setMinutes(expiresAt.getMinutes() + 15);
+
+    await this.prisma.passwordReset.create({
+      data: {
+        id: randomUUID(),
+        email: `change_email:${userId}:${newEmail}`,
+        otp,
+        expiresAt,
+        isUsed: false,
+      },
+    });
+
+    try {
+      await this.emailService.sendChangeEmailOtp(newEmail, otp, currentUser.fullName || undefined);
+      return {
+        message: `Mã OTP đã được gửi đến ${newEmail}. Vui lòng kiểm tra hộp thư.`,
+        expiresIn: '15 phút',
+      };
+    } catch (error) {
+      await this.prisma.passwordReset.deleteMany({
+        where: { email: `change_email:${userId}:${newEmail}` },
+      });
+      throw new BadRequestException('Không thể gửi email. Vui lòng thử lại sau.');
+    }
+  }
+
+  /**
+   * Bước 2: Xác nhận OTP và cập nhật email mới
+   */
+  async confirmEmailChange(userId: string, dto: ConfirmEmailChangeDto) {
+    const { newEmail, otp } = dto;
+
+    const record = await this.prisma.passwordReset.findFirst({
+      where: {
+        email: `change_email:${userId}:${newEmail}`,
+        otp,
+        isUsed: false,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (!record) {
+      throw new BadRequestException('Mã OTP không hợp lệ hoặc đã được sử dụng');
+    }
+
+    if (new Date() > record.expiresAt) {
+      throw new BadRequestException('Mã OTP đã hết hạn. Vui lòng yêu cầu mã mới.');
+    }
+
+    // Kiểm tra lần cuối email chưa bị đăng ký bởi ai khác trong lúc chờ
+    const emailTaken = await this.prisma.user.findUnique({
+      where: { email: newEmail },
+    });
+
+    if (emailTaken) {
+      throw new ConflictException('Email đã được sử dụng bởi tài khoản khác');
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: userId },
+        data: { email: newEmail, updatedAt: new Date() },
+      }),
+      this.prisma.passwordReset.update({
+        where: { id: record.id },
+        data: { isUsed: true },
+      }),
+    ]);
+
+    return { message: 'Cập nhật email thành công.' };
   }
 
   /**

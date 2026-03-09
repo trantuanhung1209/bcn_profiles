@@ -15,3 +15,12 @@ export const authProvider = {
 } as const
 
 export type authProvider = (typeof authProvider)[keyof typeof authProvider]
+
+
+export const UserStatus = {
+  PENDING: 'PENDING',
+  ACTIVE: 'ACTIVE',
+  BLOCKED: 'BLOCKED'
+} as const
+
+export type UserStatus = (typeof UserStatus)[keyof typeof UserStatus]

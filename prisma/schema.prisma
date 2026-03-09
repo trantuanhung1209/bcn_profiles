@@ -40,9 +40,18 @@ model User {
   typeAuth  authProvider @default(EMAIL)
   metadata  Json?
   phone     String?      @unique
+  status    UserStatus   @default(ACTIVE)
 }
 
 enum authProvider {
   EMAIL
   GOOGLE
+}
+
+// ACTIVE is the DB-level default so existing rows stay accessible after migration.
+// New registrations always receive PENDING explicitly in application code.
+enum UserStatus {
+  PENDING
+  ACTIVE
+  BLOCKED
 }

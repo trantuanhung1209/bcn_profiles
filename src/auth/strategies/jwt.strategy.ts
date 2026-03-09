@@ -53,7 +53,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
           email: true,
           fullName: true,
           avatar: true,
-          role: true, // Lấy role từ database
+          role: true,
+          status: true,
           createdAt: true,
           updatedAt: true,
         },
@@ -63,6 +64,13 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
       if (!user) {
         throw new UnauthorizedException('Người dùng không tồn tại');
+      }
+
+      if (user.status === 'PENDING') {
+        throw new UnauthorizedException('Tài khoản đang chờ admin phê duyệt.');
+      }
+      if (user.status === 'BLOCKED') {
+        throw new UnauthorizedException('Tài khoản đã bị khóa. Vui lòng liên hệ admin.');
       }
 
       // Return user với role để RolesGuard có thể check

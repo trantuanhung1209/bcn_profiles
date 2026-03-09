@@ -28,17 +28,26 @@ export class AuthService {
         password: true,
         fullName: true,
         avatar: true,
-        role: true, // Lấy role từ database
+        role: true,
+        status: true,
         createdAt: true,
         updatedAt: true,
       },
     });
 
-    if (user && user.password && await bcrypt.compare(password, user.password)) {
-      const { password: _, ...result } = user;
-      return result;
+    if (!user || !user.password || !await bcrypt.compare(password, user.password)) {
+      return null;
     }
-    return null;
+
+    if (user.status === 'PENDING') {
+      throw new UnauthorizedException('Tài khoản đang chờ admin phê duyệt. Vui lòng chờ thông báo qua email.');
+    }
+    if (user.status === 'BLOCKED') {
+      throw new UnauthorizedException('Tài khoản đã bị khóa. Vui lòng liên hệ admin.');
+    }
+
+    const { password: _, ...result } = user;
+    return result;
   }
 
   async register(registerDto: RegisterDto) {
@@ -65,29 +74,33 @@ export class AuthService {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Tạo user mới
-    const user = await this.prisma.user.create({
-      data: {
-        id: `BCN_${randomUUID()}`,
-        email,
-        fullName,
-        password: hashedPassword,
-        avatar,
-        phone,
-        updatedAt: new Date(),
-      },
-      select: {
-        id: true,
-        email: true,
-        fullName: true,
-        avatar: true,
-        phone: true,
-        createdAt: true,
-      },
-    });
+    // Tạo user mới với status PENDING (chờ admin duyệt)
+    const user = await this.prisma.createUserWithUniqueId((id) =>
+      this.prisma.user.create({
+        data: {
+          id,
+          email,
+          fullName,
+          password: hashedPassword,
+          avatar,
+          phone,
+          status: 'PENDING',
+          updatedAt: new Date(),
+        },
+        select: {
+          id: true,
+          email: true,
+          fullName: true,
+          avatar: true,
+          phone: true,
+          status: true,
+          createdAt: true,
+        },
+      }),
+    );
 
     return {
-      message: 'Đăng ký thành công',
+      message: 'Đăng ký thành công. Tài khoản đang chờ admin phê duyệt, bạn sẽ nhận được email thông báo khi được duyệt.',
       user,
     };
   }
@@ -135,12 +148,20 @@ export class AuthService {
           email: true,
           fullName: true,
           avatar: true,
-          role: true, // Lấy role
+          role: true,
+          status: true,
         },
       });
 
       if (!user) {
         throw new UnauthorizedException('Người dùng không tồn tại');
+      }
+
+      if (user.status === 'PENDING') {
+        throw new UnauthorizedException('Tài khoản đang chờ admin phê duyệt.');
+      }
+      if (user.status === 'BLOCKED') {
+        throw new UnauthorizedException('Tài khoản đã bị khóa. Vui lòng liên hệ admin.');
       }
 
       // Tạo tokens mới
@@ -439,32 +460,46 @@ export class AuthService {
         fullName: true,
         avatar: true,
         role: true,
+        status: true,
         createdAt: true,
         updatedAt: true,
       },
     });
 
-    // Nếu user chưa tồn tại, tạo mới
+    // Nếu user chưa tồn tại, tạo mới với status PENDING
     if (!user) {
-      user = await this.prisma.user.create({
-        data: {
-          id: `BCN_${randomUUID()}`,
-          email,
-          fullName,
-          avatar,
-          password: null, // Google login không có password
-          updatedAt: new Date(),
-        },
-        select: {
-          id: true,
-          email: true,
-          fullName: true,
-          avatar: true,
-          role: true,
-          createdAt: true,
-          updatedAt: true,
-        },
-      });
+      user = await this.prisma.createUserWithUniqueId((id) =>
+        this.prisma.user.create({
+          data: {
+            id,
+            email,
+            fullName,
+            avatar,
+            password: null,
+            status: 'PENDING',
+            updatedAt: new Date(),
+          },
+          select: {
+            id: true,
+            email: true,
+            fullName: true,
+            avatar: true,
+            role: true,
+            status: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        }),
+      );
+
+      throw new UnauthorizedException('Tài khoản mới đã được tạo và đang chờ admin phê duyệt. Bạn sẽ nhận được email thông báo khi được duyệt.');
+    }
+
+    if (user.status === 'PENDING') {
+      throw new UnauthorizedException('Tài khoản đang chờ admin phê duyệt. Vui lòng chờ thông báo qua email.');
+    }
+    if (user.status === 'BLOCKED') {
+      throw new UnauthorizedException('Tài khoản đã bị khóa. Vui lòng liên hệ admin.');
     }
 
     // Tạo JWT tokens

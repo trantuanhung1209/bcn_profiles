@@ -74,6 +74,61 @@ export class EmailService {
   }
 
   /**
+   * Gửi email thông báo tài khoản bị từ chối
+   */
+  async sendRejectionEmail(email: string, fullName?: string): Promise<void> {
+    const mailOptions = {
+      from: `"BCN Support" <${this.configService.get<string>('EMAIL_USER')}>`,
+      to: email,
+      subject: 'Yêu cầu đăng ký không được chấp thuận - BCN Profiles',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
+          <h2 style="color: #dc2626;">Yêu cầu đăng ký không được chấp thuận</h2>
+          <p>Xin chào${fullName ? ` <b>${fullName}</b>` : ''},</p>
+          <p>Rất tiếc, yêu cầu đăng ký tài khoản BCN Profiles của bạn đã không được admin chấp thuận.</p>
+          <p>Nếu bạn cho rằng đây là nhầm lẫn, vui lòng liên hệ với chúng tôi để được hỗ trợ.</p>
+          <p style="margin-top:24px;color:#6b7280;font-size:12px;">© ${new Date().getFullYear()} BCN Profiles</p>
+        </div>
+      `,
+    };
+
+    try {
+      await this.transporter.sendMail(mailOptions);
+    } catch (error) {
+      console.error('Error sending rejection email:', error);
+    }
+  }
+
+  /**
+   * Gửi email thông báo tài khoản đã được admin phê duyệt
+   */
+  async sendApprovalEmail(email: string, fullName?: string): Promise<void> {
+    const mailOptions = {
+      from: `"BCN Support" <${this.configService.get<string>('EMAIL_USER')}>`,
+      to: email,
+      subject: 'Tài khoản của bạn đã được phê duyệt - BCN Profiles',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
+          <h2 style="color: #16a34a;">Tài khoản đã được phê duyệt ✅</h2>
+          <p>Xin chào${fullName ? ` <b>${fullName}</b>` : ''},</p>
+          <p>Tài khoản BCN Profiles của bạn đã được admin phê duyệt. Bạn có thể đăng nhập ngay bây giờ.</p>
+          <a href="${this.configService.get<string>('APP_URL') || 'http://localhost:3000'}/auth/login"
+             style="display:inline-block;padding:12px 24px;background:#4F46E5;color:#fff;border-radius:6px;text-decoration:none;margin-top:16px;"
+          >Đăng nhập ngay</a>
+          <p style="margin-top:24px;color:#6b7280;font-size:12px;">© ${new Date().getFullYear()} BCN Profiles</p>
+        </div>
+      `,
+    };
+
+    try {
+      await this.transporter.sendMail(mailOptions);
+    } catch (error) {
+      console.error('Error sending approval email:', error);
+      throw new Error('Không thể gửi email thông báo. Vui lòng thử lại sau.');
+    }
+  }
+
+  /**
    * Gửi OTP xác nhận đổi email đến địa chỉ email mới
    */
   async sendChangeEmailOtp(newEmail: string, otp: string, fullName?: string): Promise<void> {

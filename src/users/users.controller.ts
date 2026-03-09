@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, ForbiddenException, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { UsersService } from './users.service';
 import type { SortableUserFields, SortOrder } from './users.service';
 import { QueryUsersDto } from './dto/query-users.dto';
@@ -31,6 +31,19 @@ export class UsersController {
     return {
       ...result,
     };
+  }
+
+  @Get('pending')
+  @Roles(Role.ADMIN)
+  async findPendingUsers(@Query() query: QueryUsersDto) {
+    const { page, limit, sort, order, search } = query;
+    return this.usersService.findPending(
+      page,
+      limit,
+      sort as SortableUserFields,
+      order as SortOrder,
+      search,
+    );
   }
 
   @Get('count')
@@ -74,9 +87,43 @@ export class UsersController {
     };
   }
 
+  @Patch(':id/approve')
+  @Roles(Role.ADMIN)
+  async approveUser(@Param('id') id: string) {
+    const user = await this.usersService.approveUser(id);
+    return { message: 'Tài khoản đã được phê duyệt', user };
+  }
+
+  @Patch(':id/block')
+  @Roles(Role.ADMIN)
+  async blockUser(@Param('id') id: string, @User() currentUser: any) {
+    if (currentUser.id === id) {
+      throw new ForbiddenException('Bạn không thể tự khóa tài khoản của chính mình');
+    }
+    const user = await this.usersService.blockUser(id);
+    return { message: 'Tài khoản đã bị khóa', user };
+  }
+
+  @Patch(':id/unblock')
+  @Roles(Role.ADMIN)
+  async unblockUser(@Param('id') id: string) {
+    const user = await this.usersService.unblockUser(id);
+    return { message: 'Tài khoản đã được mở khóa', user };
+  }
+
+  @Delete(':id/reject')
+  @Roles(Role.ADMIN)
+  async rejectUser(@Param('id') id: string) {
+    await this.usersService.rejectUser(id);
+    return { message: 'Yêu cầu đăng ký đã bị từ chối và xóa khỏi hệ thống' };
+  }
+
   @Delete(':id')
   @Roles(Role.ADMIN)
-  async deleteUser(@Param('id') id: string) {
+  async deleteUser(@Param('id') id: string, @User() currentUser: any) {
+    if (currentUser.id === id) {
+      throw new ForbiddenException('Bạn không thể tự xóa tài khoản của chính mình');
+    }
     await this.usersService.deleteUser(id);
     return {
       message: 'User đã được xóa',
@@ -84,7 +131,7 @@ export class UsersController {
   }
 
   @Patch('me')
-  @Roles(Role.USER)
+  @Roles(Role.USER, Role.ADMIN)
   async updateUser(
     @Body() updateData: UpdateUserDto,
     @User() currentUser: any,

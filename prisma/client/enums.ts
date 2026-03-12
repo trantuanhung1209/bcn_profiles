@@ -24,3 +24,14 @@ export const UserStatus = {
 } as const
 
 export type UserStatus = (typeof UserStatus)[keyof typeof UserStatus]
+
+
+export const EventType = {
+  JOIN_BCN: 'JOIN_BCN',
+  COURSE_COMPLETE: 'COURSE_COMPLETE',
+  QUIZ_COMPLETE: 'QUIZ_COMPLETE',
+  PROJECT_COMPLETE: 'PROJECT_COMPLETE',
+  SEMESTER_COMPLETE: 'SEMESTER_COMPLETE'
+} as const
+
+export type EventType = (typeof EventType)[keyof typeof EventType]

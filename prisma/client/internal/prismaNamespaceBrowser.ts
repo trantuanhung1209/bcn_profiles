@@ -53,7 +53,8 @@ export const AnyNull = runtime.AnyNull
 export const ModelName = {
   PasswordReset: 'PasswordReset',
   TokenBlacklist: 'TokenBlacklist',
-  User: 'User'
+  User: 'User',
+  TimelineEvent: 'TimelineEvent'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -119,6 +120,18 @@ export const UserScalarFieldEnum = {
 } as const
 
 export type UserScalarFieldEnum = (typeof UserScalarFieldEnum)[keyof typeof UserScalarFieldEnum]
+
+
+export const TimelineEventScalarFieldEnum = {
+  id: 'id',
+  userUuid: 'userUuid',
+  eventType: 'eventType',
+  title: 'title',
+  metadata: 'metadata',
+  createdAt: 'createdAt'
+} as const
+
+export type TimelineEventScalarFieldEnum = (typeof TimelineEventScalarFieldEnum)[keyof typeof TimelineEventScalarFieldEnum]
 
 
 export const SortOrder = {

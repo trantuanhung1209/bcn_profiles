@@ -12,6 +12,7 @@ import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
+import { TimelineEventsModule } from './timeline-events/timeline-events.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { RolesGuard } from './auth/guards/roles.guard';
     PrismaModule,
     UsersModule,
     AuthModule,
+    TimelineEventsModule,
   ],
   controllers: [AppController],
   providers: [

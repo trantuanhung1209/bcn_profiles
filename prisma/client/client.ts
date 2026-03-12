@@ -54,3 +54,8 @@ export type TokenBlacklist = Prisma.TokenBlacklistModel
  * 
  */
 export type User = Prisma.UserModel
+/**
+ * Model TimelineEvent
+ * 
+ */
+export type TimelineEvent = Prisma.TimelineEventModel

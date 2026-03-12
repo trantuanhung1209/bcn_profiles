@@ -52,7 +52,7 @@ export class AuthController {
       httpOnly: true, // Cookie không thể truy cập từ JavaScript
       secure: process.env.NODE_ENV === 'production', // Chỉ gửi qua HTTPS trong production
       sameSite: 'strict', // Bảo vệ khỏi CSRF
-      maxAge: 15 * 60 * 1000, // 15 phút
+      maxAge: 60 * 60 * 1000, // 1 giờ
     });
 
     // Set refresh token vào cookie
@@ -125,7 +125,7 @@ export class AuthController {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
-      maxAge: 15 * 60 * 1000, // 15 phút
+      maxAge: 60 * 60 * 1000, // 1 giờ
     });
 
     // Set refresh token mới vào cookie
@@ -199,7 +199,7 @@ export class AuthController {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
-      maxAge: 15 * 60 * 1000, // 15 phút
+      maxAge: 60 * 60 * 1000, // 1 giờ
     });
 
     // Set refresh token vào cookie

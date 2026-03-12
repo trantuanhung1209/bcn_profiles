@@ -23,12 +23,112 @@
 
 ## Description
 
+BCN Profiles - Hệ thống quản lý hồ sơ và timeline sự kiện cho học viên BCN.
+
+### ✨ Features
+
+- 🔐 **Authentication & Authorization**
+  - Email/Password authentication
+  - Google OAuth 2.0
+  - JWT with access & refresh tokens
+  - Role-based access control (USER, ADMIN)
+  - Password reset with OTP via email
+  - Email change with OTP verification
+  
+- 👥 **User Management**
+  - User registration with admin approval
+  - User profile management
+  - Search and filter users
+  - User status management (PENDING, ACTIVE, BLOCKED)
+  - Admin dashboard for user management
+  
+- 📅 **Timeline Events**
+  - Track user milestones and achievements
+  - Event types: JOIN_BCN, COURSE_COMPLETE, QUIZ_COMPLETE, PROJECT_COMPLETE, SEMESTER_COMPLETE
+  - User can create and update their own events
+  - Admin can delete any events
+  
+- 🛡️ **Security**
+  - Rate limiting (ThrottleGuard)
+  - Token blacklist on logout
+  - HTTP-only cookies for tokens
+  - Input validation with class-validator
+  
+- 🗄️ **Database**
+  - PostgreSQL with Prisma ORM
+  - Type-safe database queries
+  - Automated migrations
+
+### 🛠️ Tech Stack
+
+- **Framework:** NestJS
+- **Language:** TypeScript
+- **Database:** PostgreSQL
+- **ORM:** Prisma
+- **Authentication:** Passport.js (JWT, Google OAuth)
+- **Validation:** class-validator, class-transformer
+- **Email:** Nodemailer
+
 [Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+
+## 📚 API Documentation
+
+Xem tài liệu đầy đủ về tất cả API endpoints tại: **[API_DOCS.md](./API_DOCS.md)**
+
+Tài liệu bao gồm:
+- ✅ Authentication APIs (đăng ký, đăng nhập, quên mật khẩu, Google OAuth)
+- ✅ User Management APIs (CRUD, phê duyệt, khóa/mở khóa)
+- ✅ Timeline Events APIs (tạo, sửa, xóa timeline)
+- ✅ Request/Response examples
+- ✅ Error handling
+- ✅ Authentication flow
+- ✅ Tips for Frontend development
 
 ## Project setup
 
 ```bash
 $ npm install
+```
+
+## Environment Setup
+
+Tạo file `.env` trong thư mục root với nội dung:
+
+```env
+# Database
+DATABASE_URL="postgresql://user:password@host:5432/database"
+
+# JWT
+JWT_SECRET="your-jwt-secret-key"
+JWT_REFRESH_SECRET="your-jwt-refresh-secret-key"
+
+# Email (for OTP)
+EMAIL_HOST="smtp.gmail.com"
+EMAIL_PORT=587
+EMAIL_USER="your-email@gmail.com"
+EMAIL_PASSWORD="your-app-password"
+
+# Google OAuth
+GOOGLE_CLIENT_ID="your-google-client-id"
+GOOGLE_CLIENT_SECRET="your-google-client-secret"
+GOOGLE_CALLBACK_URL="http://localhost:3000/auth/google/callback"
+
+# App
+NODE_ENV="development"
+PORT=3000
+```
+
+## Database Setup
+
+```bash
+# Push schema to database
+$ npx prisma db push
+
+# Generate Prisma Client
+$ npx prisma generate
+
+# (Optional) Open Prisma Studio
+$ npx prisma studio
 ```
 
 ## Compile and run the project
@@ -55,6 +155,51 @@ $ npm run test:e2e
 
 # test coverage
 $ npm run test:cov
+```
+
+## 📁 Project Structure
+
+```
+src/
+├── auth/                   # Authentication module
+│   ├── guards/            # JWT & Roles guards
+│   ├── strategies/        # Passport strategies
+│   ├── decorators/        # Custom decorators
+│   └── dto/               # Data transfer objects
+├── users/                 # User management module
+│   └── dto/
+├── timeline-events/       # Timeline events module
+│   └── dto/
+├── prisma/                # Prisma configuration
+│   └── prisma.service.ts
+├── common/                # Shared utilities
+│   ├── interceptors/
+│   └── utils/
+└── middlewares/           # Custom middlewares
+
+prisma/
+├── schema.prisma          # Database schema
+└── migrations/            # Database migrations
+```
+
+## 🚀 Quick Start
+
+1. Clone repository
+2. Install dependencies: `npm install`
+3. Setup `.env` file
+4. Push database schema: `npx prisma db push`
+5. Generate Prisma Client: `npx prisma generate`
+6. Start development: `npm run start:dev`
+7. Access API at: `http://localhost:3000`
+
+## 📋 Default Admin Account
+
+Sau khi chạy seed (nếu có), bạn có thể tạo admin account thông qua:
+- Register qua API → Admin approve → Promote to ADMIN role
+
+Hoặc tạo trực tiếp trong database:
+```sql
+UPDATE "User" SET role = 'ADMIN', status = 'ACTIVE' WHERE email = 'admin@example.com';
 ```
 
 ## Deployment

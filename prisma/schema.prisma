@@ -28,19 +28,20 @@ model TokenBlacklist {
 }
 
 model User {
-  id        String       @id
-  email     String       @unique
-  password  String?
-  fullName  String?
-  avatar    String?
-  createdAt DateTime     @default(now())
-  updatedAt DateTime
-  role      String       @default("USER")
-  googleId  String?      @unique
-  typeAuth  authProvider @default(EMAIL)
-  metadata  Json?
-  phone     String?      @unique
-  status    UserStatus   @default(ACTIVE)
+  id             String          @id
+  email          String          @unique
+  password       String?
+  fullName       String?
+  avatar         String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime
+  role           String          @default("USER")
+  googleId       String?         @unique
+  typeAuth       authProvider    @default(EMAIL)
+  metadata       Json?
+  phone          String?         @unique
+  status         UserStatus      @default(ACTIVE)
+  timelineEvents TimelineEvent[]
 }
 
 enum authProvider {
@@ -54,4 +55,26 @@ enum UserStatus {
   PENDING
   ACTIVE
   BLOCKED
+}
+
+model TimelineEvent {
+  id        Int       @id @default(autoincrement())
+  userUuid  String    @map("user_uuid")
+  eventType EventType @map("event_type")
+  title     String
+  metadata  Json?
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userUuid], references: [id], onDelete: Cascade)
+
+  @@index([userUuid])
+  @@map("timeline_events")
+}
+
+enum EventType {
+  JOIN_BCN
+  COURSE_COMPLETE
+  QUIZ_COMPLETE
+  PROJECT_COMPLETE
+  SEMESTER_COMPLETE
 }

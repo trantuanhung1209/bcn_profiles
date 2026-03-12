@@ -142,6 +142,15 @@ export class UsersController {
     };
   }
 
+  // User xem profile công khai của user khác
+  @Get(':id/profile')
+  async getUserPublicProfile(@Param('id') id: string) {
+    const user = await this.usersService.getPublicProfile(id);
+    return {
+      user: user,
+    };
+  }
+
   // Ví dụ: Route cho user xem thông tin của chính họ
   @Get('me/profile')
   async getMyProfile(@User() user: any) {

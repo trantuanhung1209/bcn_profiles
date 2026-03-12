@@ -386,7 +386,8 @@ type FieldRefInputType<Model, FieldType> = Model extends never ? never : FieldRe
 export const ModelName = {
   PasswordReset: 'PasswordReset',
   TokenBlacklist: 'TokenBlacklist',
-  User: 'User'
+  User: 'User',
+  TimelineEvent: 'TimelineEvent'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -402,7 +403,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "passwordReset" | "tokenBlacklist" | "user"
+    modelProps: "passwordReset" | "tokenBlacklist" | "user" | "timelineEvent"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -628,6 +629,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    TimelineEvent: {
+      payload: Prisma.$TimelineEventPayload<ExtArgs>
+      fields: Prisma.TimelineEventFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.TimelineEventFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TimelineEventPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.TimelineEventFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TimelineEventPayload>
+        }
+        findFirst: {
+          args: Prisma.TimelineEventFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TimelineEventPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.TimelineEventFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TimelineEventPayload>
+        }
+        findMany: {
+          args: Prisma.TimelineEventFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TimelineEventPayload>[]
+        }
+        create: {
+          args: Prisma.TimelineEventCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TimelineEventPayload>
+        }
+        createMany: {
+          args: Prisma.TimelineEventCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.TimelineEventCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TimelineEventPayload>[]
+        }
+        delete: {
+          args: Prisma.TimelineEventDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TimelineEventPayload>
+        }
+        update: {
+          args: Prisma.TimelineEventUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TimelineEventPayload>
+        }
+        deleteMany: {
+          args: Prisma.TimelineEventDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.TimelineEventUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.TimelineEventUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TimelineEventPayload>[]
+        }
+        upsert: {
+          args: Prisma.TimelineEventUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TimelineEventPayload>
+        }
+        aggregate: {
+          args: Prisma.TimelineEventAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateTimelineEvent>
+        }
+        groupBy: {
+          args: Prisma.TimelineEventGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.TimelineEventGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.TimelineEventCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.TimelineEventCountAggregateOutputType> | number
+        }
+      }
+    }
   }
 } & {
   other: {
@@ -714,6 +789,18 @@ export const UserScalarFieldEnum = {
 } as const
 
 export type UserScalarFieldEnum = (typeof UserScalarFieldEnum)[keyof typeof UserScalarFieldEnum]
+
+
+export const TimelineEventScalarFieldEnum = {
+  id: 'id',
+  userUuid: 'userUuid',
+  eventType: 'eventType',
+  title: 'title',
+  metadata: 'metadata',
+  createdAt: 'createdAt'
+} as const
+
+export type TimelineEventScalarFieldEnum = (typeof TimelineEventScalarFieldEnum)[keyof typeof TimelineEventScalarFieldEnum]
 
 
 export const SortOrder = {
@@ -855,6 +942,20 @@ export type ListEnumUserStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$P
 
 
 /**
+ * Reference to a field of type 'EventType'
+ */
+export type EnumEventTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'EventType'>
+    
+
+
+/**
+ * Reference to a field of type 'EventType[]'
+ */
+export type ListEnumEventTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'EventType[]'>
+    
+
+
+/**
  * Reference to a field of type 'Float'
  */
 export type FloatFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Float'>
@@ -965,6 +1066,7 @@ export type GlobalOmitConfig = {
   passwordReset?: Prisma.PasswordResetOmit
   tokenBlacklist?: Prisma.TokenBlacklistOmit
   user?: Prisma.UserOmit
+  timelineEvent?: Prisma.TimelineEventOmit
 }
 
 /* Types for Logging */

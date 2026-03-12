@@ -62,6 +62,18 @@ export class UsersService {
       createdAt: true,
       updatedAt: true,
       password: false,
+      timelineEvents: {
+        orderBy: {
+          createdAt: 'desc',
+        },
+        select: {
+          id: true,
+          eventType: true,
+          title: true,
+          metadata: true,
+          createdAt: true,
+        },
+      },
     } as const;
 
     if (search) {
@@ -132,6 +144,18 @@ export class UsersService {
           createdAt: true,
           updatedAt: true,
           password: false,
+          timelineEvents: {
+            orderBy: {
+              createdAt: 'desc',
+            },
+            select: {
+              id: true,
+              eventType: true,
+              title: true,
+              metadata: true,
+              createdAt: true,
+            },
+          },
         },
         orderBy: {
           [sort]: order,
@@ -189,6 +213,18 @@ export class UsersService {
           createdAt: true,
           updatedAt: true,
           password: false,
+          timelineEvents: {
+            orderBy: {
+              createdAt: 'desc',
+            },
+            select: {
+              id: true,
+              eventType: true,
+              title: true,
+              metadata: true,
+              createdAt: true,
+            },
+          },
         },
         orderBy: {
           [sort]: order,
@@ -223,10 +259,61 @@ export class UsersService {
         createdAt: true,
         updatedAt: true,
         password: false,
+        timelineEvents: {
+          orderBy: {
+            createdAt: 'desc',
+          },
+          select: {
+            id: true,
+            eventType: true,
+            title: true,
+            metadata: true,
+            createdAt: true,
+          },
+        },
       },
     });
 
     if (!user) {
+      throw new NotFoundException(`User với ID ${id} không tồn tại`);
+    }
+
+    return user;
+  }
+
+  async getPublicProfile(id: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        email: true,
+        fullName: true,
+        avatar: true,
+        role: true,
+        status: true,
+        createdAt: true,
+        timelineEvents: {
+          orderBy: {
+            createdAt: 'desc',
+          },
+          select: {
+            id: true,
+            eventType: true,
+            title: true,
+            metadata: true,
+            createdAt: true,
+          },
+        },
+        // Không trả về: phone, metadata, googleId, typeAuth, updatedAt
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException(`User với ID ${id} không tồn tại`);
+    }
+
+    // Chỉ cho phép xem profile của user ACTIVE
+    if (user.status !== 'ACTIVE') {
       throw new NotFoundException(`User với ID ${id} không tồn tại`);
     }
 

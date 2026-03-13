@@ -10,8 +10,12 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { LocalStrategy } from './strategies/local.strategy';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { GoogleStrategy } from './strategies/google.strategy';
-import { TokenBlacklistService } from './token-blacklist.service';
-import { EmailService } from './email.service';
+import { TokenBlacklistService } from './services/token-blacklist.service';
+import { EmailService } from './services/email.service';
+import { TwoFactorAuthService } from './services/two-factor-auth.service';
+import { TwoFactorSetupGuard } from './guards/two-factor-setup.guard';
+import { TwoFactorVerificationGuard } from './guards/two-factor-verification.guard';
+import { TwoFactorRecoveryGuard } from './guards/two-factor-recovery.guard';
 
 @Module({
   imports: [
@@ -36,7 +40,11 @@ import { EmailService } from './email.service';
     GoogleStrategy,
     TokenBlacklistService,
     EmailService,
+    TwoFactorAuthService,
+    TwoFactorSetupGuard,
+    TwoFactorVerificationGuard,
+    TwoFactorRecoveryGuard,
   ],
-  exports: [AuthService, TokenBlacklistService],
+  exports: [AuthService, TokenBlacklistService, TwoFactorAuthService],
 })
 export class AuthModule {}

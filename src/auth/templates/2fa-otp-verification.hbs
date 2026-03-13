@@ -1,0 +1,29 @@
+<div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
+  <div style="background-color: #4F46E5; padding: 20px; border-radius: 8px 8px 0 0; text-align: center;">
+    <h1 style="color: white; margin: 0;">🔐 Xác nhận 2FA</h1>
+  </div>
+
+  <div style="background-color: #f9fafb; padding: 30px; border-radius: 0 0 8px 8px;">
+    <p>Xin chào{{#if fullName}} <b>{{fullName}}</b>{{/if}},</p>
+
+    <p>Bạn đã yêu cầu xác nhận xác thực 2 lớp. Mã OTP của bạn là:</p>
+
+    <div style="font-size: 42px; font-weight: bold; letter-spacing: 8px; color: #16a34a; margin: 30px 0; text-align: center; background-color: #f0fdf4; padding: 20px; border-radius: 6px;">
+      {{otp}}
+    </div>
+
+    <div style="background-color: #fef3c7; padding: 15px; border-radius: 6px; margin: 20px 0; border-left: 4px solid #f59e0b;">
+      <p style="margin: 0; color: #92400e;">
+        ⚠️ <strong>Mã có hiệu lực trong 15 phút.</strong> Không chia sẻ mã này cho bất kỳ ai.
+      </p>
+    </div>
+
+    <p style="color: #6b7280; font-size: 14px;">Nếu bạn không yêu cầu mã này, vui lòng bỏ qua email này.</p>
+
+    <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;" />
+
+    <p style="color: #9ca3af; font-size: 12px; margin: 0;">
+      © {{year}} BCN Profiles | Nếu bạn có thắc mắc, vui lòng liên hệ với chúng tôi.
+    </p>
+  </div>
+</div>

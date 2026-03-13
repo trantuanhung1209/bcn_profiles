@@ -55,6 +55,11 @@ export type TokenBlacklist = Prisma.TokenBlacklistModel
  */
 export type User = Prisma.UserModel
 /**
+ * Model TwoFactorRecoveryCode
+ * 
+ */
+export type TwoFactorRecoveryCode = Prisma.TwoFactorRecoveryCodeModel
+/**
  * Model TimelineEvent
  * 
  */

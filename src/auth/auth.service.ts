@@ -6,10 +6,11 @@ import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
-import { EmailService } from './email.service';
+import { EmailService } from './services/email.service';
 import { randomUUID } from 'crypto';
 import { RequestEmailChangeDto } from './dto/request-email-change.dto';
 import { ConfirmEmailChangeDto } from './dto/confirm-email-change.dto';
+import { TwoFactorAuthService } from './services/two-factor-auth.service';
 
 @Injectable()
 export class AuthService {
@@ -17,6 +18,7 @@ export class AuthService {
     private prisma: PrismaService,
     private jwtService: JwtService,
     private emailService: EmailService,
+    private twoFactorAuthService: TwoFactorAuthService,
   ) {}
 
   async validateUser(email: string, password: string): Promise<any> {
@@ -30,6 +32,7 @@ export class AuthService {
         avatar: true,
         role: true,
         status: true,
+        twoFactorEnabled: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -106,22 +109,66 @@ export class AuthService {
   }
 
   async login(user: any) {
-    const payload = { 
-      email: user.email, 
-      sub: user.id,
-      role: user.role, // Thêm role vào JWT payload
+    // Check 2FA status
+    const twoFactorEnabled = user.twoFactorEnabled || false;
+
+    if (!twoFactorEnabled) {
+      // 2FA not enabled - force user to setup 2FA
+      const setupToken = this.twoFactorAuthService.generateSetupToken(user.id, user.email);
+      return {
+        requiresTwoFactorSetup: true,
+        setupToken,
+        message: 'Bạn phải cài đặt xác thực 2 lớp (2FA) để tiếp tục.',
+      };
+    }
+
+    // 2FA is enabled - require verification
+    const verificationToken = this.twoFactorAuthService.generateVerificationToken(user.id, user.email);
+    return {
+      requiresTwoFactorVerification: true,
+      verificationToken,
+      message: 'Vui lòng xác nhận 2FA để hoàn tất đăng nhập.',
     };
-    
-    // Tạo access token (thời gian ngắn)
-    const access_token = this.jwtService.sign(payload, {
-      expiresIn: '60m', // 60 phút
+  }
+
+  /**
+   * Generate access and refresh tokens after successful 2FA verification
+   */
+  async generateTokensAfterTwoFactorVerification(userId: string): Promise<{
+    access_token: string;
+    refresh_token: string;
+    user: any;
+  }> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        fullName: true,
+        avatar: true,
+        role: true,
+        status: true,
+      },
     });
 
-    // Tạo refresh token (thời gian dài)
-    const refresh_token = this.jwtService.sign(payload, {
-      expiresIn: '7d', // 7 ngày
+    if (!user) {
+      throw new UnauthorizedException('Người dùng không tồn tại');
+    }
+
+    const payload = {
+      email: user.email,
+      sub: user.id,
+      role: user.role,
+    };
+
+    const access_token = this.jwtService.sign(payload, {
+      expiresIn: '60m',
     });
-    
+
+    const refresh_token = this.jwtService.sign(payload, {
+      expiresIn: '7d',
+    });
+
     return {
       access_token,
       refresh_token,

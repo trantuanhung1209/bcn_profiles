@@ -54,6 +54,7 @@ export const ModelName = {
   PasswordReset: 'PasswordReset',
   TokenBlacklist: 'TokenBlacklist',
   User: 'User',
+  TwoFactorRecoveryCode: 'TwoFactorRecoveryCode',
   TimelineEvent: 'TimelineEvent'
 } as const
 
@@ -116,10 +117,24 @@ export const UserScalarFieldEnum = {
   typeAuth: 'typeAuth',
   metadata: 'metadata',
   phone: 'phone',
-  status: 'status'
+  status: 'status',
+  twoFactorEnabled: 'twoFactorEnabled',
+  totpSecret: 'totpSecret'
 } as const
 
 export type UserScalarFieldEnum = (typeof UserScalarFieldEnum)[keyof typeof UserScalarFieldEnum]
+
+
+export const TwoFactorRecoveryCodeScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  code: 'code',
+  isUsed: 'isUsed',
+  usedAt: 'usedAt',
+  createdAt: 'createdAt'
+} as const
+
+export type TwoFactorRecoveryCodeScalarFieldEnum = (typeof TwoFactorRecoveryCodeScalarFieldEnum)[keyof typeof TwoFactorRecoveryCodeScalarFieldEnum]
 
 
 export const TimelineEventScalarFieldEnum = {

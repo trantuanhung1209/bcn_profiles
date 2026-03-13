@@ -9,9 +9,9 @@ import * as bcrypt from 'bcrypt';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { vietnameseIncludes } from '../common/utils/vietnamese.util';
-import { EmailService } from '../auth/email.service';
+import { EmailService } from '../auth/services/email.service';
 
-export type UserWithoutPassword = Omit<User, 'password'>;
+export type UserWithoutPassword = Omit<User, 'password' | 'twoFactorEnabled' | 'totpSecret' | 'twoFactorRecoveryCodes'>;
 
 export type SortableUserFields =
   | 'id'

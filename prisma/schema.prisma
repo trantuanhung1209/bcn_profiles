@@ -28,20 +28,24 @@ model TokenBlacklist {
 }
 
 model User {
-  id             String          @id
-  email          String          @unique
-  password       String?
-  fullName       String?
-  avatar         String?
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime
-  role           String          @default("USER")
-  googleId       String?         @unique
-  typeAuth       authProvider    @default(EMAIL)
-  metadata       Json?
-  phone          String?         @unique
-  status         UserStatus      @default(ACTIVE)
-  timelineEvents TimelineEvent[]
+  id                        String                       @id
+  email                     String                       @unique
+  password                  String?
+  fullName                  String?
+  avatar                    String?
+  createdAt                 DateTime                     @default(now())
+  updatedAt                 DateTime
+  role                      String                       @default("USER")
+  googleId                  String?                      @unique
+  typeAuth                  authProvider                 @default(EMAIL)
+  metadata                  Json?
+  phone                     String?                      @unique
+  status                    UserStatus                   @default(ACTIVE)
+  // 2FA fields
+  twoFactorEnabled          Boolean                      @default(false)
+  totpSecret                String?
+  twoFactorRecoveryCodes    TwoFactorRecoveryCode[]
+  timelineEvents            TimelineEvent[]
 }
 
 enum authProvider {
@@ -55,6 +59,20 @@ enum UserStatus {
   PENDING
   ACTIVE
   BLOCKED
+}
+
+model TwoFactorRecoveryCode {
+  id        String    @id @default(cuid())
+  userId    String
+  code      String    // hashed recovery code
+  isUsed    Boolean   @default(false)
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("two_factor_recovery_codes")
 }
 
 model TimelineEvent {

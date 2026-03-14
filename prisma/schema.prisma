@@ -46,6 +46,8 @@ model User {
   totpSecret                String?
   twoFactorRecoveryCodes    TwoFactorRecoveryCode[]
   timelineEvents            TimelineEvent[]
+
+  @@map("users")
 }
 
 enum authProvider {

@@ -13,7 +13,7 @@ import {
   BadRequestException,
   Headers,
 } from '@nestjs/common';
-import type { Response } from 'express';
+import type { CookieOptions, Response } from 'express';
 import { AuthService } from './auth.service';
 import { AuthGuard } from '@nestjs/passport';
 import { User } from './decorators/user.decorator';
@@ -42,6 +42,42 @@ import { PrismaService } from '../prisma/prisma.service';
 
 @Controller('auth')
 export class AuthController {
+  private readonly isProduction = process.env.NODE_ENV === 'production';
+
+  private get baseCookieOptions(): CookieOptions {
+    if (this.isProduction) {
+      return {
+        httpOnly: true,
+        secure: true,
+        sameSite: 'none',
+        domain: '.uside.studio',
+        path: '/',
+      };
+    }
+
+    // Localhost testing over HTTP cannot use SameSite=None + Secure.
+    return {
+      httpOnly: true,
+      secure: false,
+      sameSite: 'lax',
+      path: '/',
+    };
+  }
+
+  private get accessTokenCookieOptions(): CookieOptions {
+    return {
+      ...this.baseCookieOptions,
+      maxAge: 60 * 60 * 1000,
+    };
+  }
+
+  private get refreshTokenCookieOptions(): CookieOptions {
+    return {
+      ...this.baseCookieOptions,
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    };
+  }
+
   constructor(
     private readonly authService: AuthService,
     private readonly tokenBlacklistService: TokenBlacklistService,
@@ -112,16 +148,8 @@ export class AuthController {
     }
 
     // Xóa cả 2 cookies với cùng options như lúc set
-    response.clearCookie('access_token', {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-    });
-    response.clearCookie('refresh_token', {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-    });
+    response.clearCookie('access_token', this.baseCookieOptions);
+    response.clearCookie('refresh_token', this.baseCookieOptions);
 
     return {
       message: 'Đăng xuất thành công',
@@ -143,20 +171,10 @@ export class AuthController {
     const result = await this.authService.refreshTokens(refreshToken);
 
     // Set access token mới vào cookie
-    response.cookie('access_token', result.access_token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 60 * 60 * 1000, // 1 giờ
-    });
+    response.cookie('access_token', result.access_token, this.accessTokenCookieOptions);
 
     // Set refresh token mới vào cookie
-    response.cookie('refresh_token', result.refresh_token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 ngày
-    });
+    response.cookie('refresh_token', result.refresh_token, this.refreshTokenCookieOptions);
 
     return {
       message: 'Làm mới token thành công',
@@ -217,20 +235,10 @@ export class AuthController {
     const result = await this.authService.googleLogin(user);
 
     // Set access token vào cookie
-    response.cookie('access_token', result.access_token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 60 * 60 * 1000, // 1 giờ
-    });
+    response.cookie('access_token', result.access_token, this.accessTokenCookieOptions);
 
     // Set refresh token vào cookie
-    response.cookie('refresh_token', result.refresh_token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 ngày
-    });
+    response.cookie('refresh_token', result.refresh_token, this.refreshTokenCookieOptions);
 
     return {
       message: 'Đăng nhập Google thành công',
@@ -361,19 +369,9 @@ export class AuthController {
     const tokens = await this.authService.generateTokensAfterTwoFactorVerification(user.userId);
 
     // Set cookies
-    response.cookie('access_token', tokens.access_token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 60 * 60 * 1000,
-    });
+    response.cookie('access_token', tokens.access_token, this.accessTokenCookieOptions);
 
-    response.cookie('refresh_token', tokens.refresh_token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
+    response.cookie('refresh_token', tokens.refresh_token, this.refreshTokenCookieOptions);
 
     return {
       success: true,
@@ -430,19 +428,9 @@ export class AuthController {
     const tokens = await this.authService.generateTokensAfterTwoFactorVerification(user.userId);
 
     // Set cookies
-    response.cookie('access_token', tokens.access_token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 60 * 60 * 1000,
-    });
+    response.cookie('access_token', tokens.access_token, this.accessTokenCookieOptions);
 
-    response.cookie('refresh_token', tokens.refresh_token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
+    response.cookie('refresh_token', tokens.refresh_token, this.refreshTokenCookieOptions);
 
     return {
       success: true,
@@ -491,19 +479,9 @@ export class AuthController {
     const tokens = await this.authService.generateTokensAfterTwoFactorVerification(user.userId);
 
     // Set cookies
-    response.cookie('access_token', tokens.access_token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 60 * 60 * 1000,
-    });
+    response.cookie('access_token', tokens.access_token, this.accessTokenCookieOptions);
 
-    response.cookie('refresh_token', tokens.refresh_token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
+    response.cookie('refresh_token', tokens.refresh_token, this.refreshTokenCookieOptions);
 
     return {
       success: true,
@@ -552,19 +530,9 @@ export class AuthController {
     const tokens = await this.authService.generateTokensAfterTwoFactorVerification(user.userId);
 
     // Set cookies
-    response.cookie('access_token', tokens.access_token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 60 * 60 * 1000,
-    });
+    response.cookie('access_token', tokens.access_token, this.accessTokenCookieOptions);
 
-    response.cookie('refresh_token', tokens.refresh_token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
+    response.cookie('refresh_token', tokens.refresh_token, this.refreshTokenCookieOptions);
 
     return {
       success: true,

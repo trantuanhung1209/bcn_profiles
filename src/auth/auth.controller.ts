@@ -702,7 +702,9 @@ export class AuthController {
     // Send notification email to user
     const userData = await this.authService.getProfile(userId);
     if (userData) {
-      await this.emailService.sendAdminResetNotification(userData.email, userData.fullName || undefined);
+      void this.emailService.sendAdminResetNotification(userData.email, userData.fullName || undefined).catch((error) => {
+        console.error('Failed to send admin reset notification in background:', error);
+      });
     }
 
     return {

@@ -303,18 +303,14 @@ export class AuthService {
       },
     });
 
-    try {
-      await this.emailService.sendChangeEmailOtp(newEmail, otp, currentUser.fullName || undefined);
-      return {
-        message: `Mã OTP đã được gửi đến ${newEmail}. Vui lòng kiểm tra hộp thư.`,
-        expiresIn: '15 phút',
-      };
-    } catch (error) {
-      await this.prisma.passwordReset.deleteMany({
-        where: { email: `change_email:${userId}:${newEmail}` },
-      });
-      throw new BadRequestException('Không thể gửi email. Vui lòng thử lại sau.');
-    }
+    void this.emailService.sendChangeEmailOtp(newEmail, otp, currentUser.fullName || undefined).catch((error) => {
+      console.error('Failed to send change-email OTP in background:', error);
+    });
+
+    return {
+      message: `Mã OTP đang được gửi đến ${newEmail}. Vui lòng kiểm tra hộp thư.`,
+      expiresIn: '15 phút',
+    };
   }
 
   /**
@@ -414,21 +410,15 @@ export class AuthService {
       },
     });
 
-    // Gửi email chứa OTP
-    try {
-      await this.emailService.sendResetPasswordEmail(email, otp, user.fullName || undefined);
-      
-      return {
-        message: 'Mã OTP đã được gửi đến email của bạn. Vui lòng kiểm tra hộp thư.',
-        expiresIn: '15 phút',
-      };
-    } catch (error) {
-      // Nếu gửi email thất bại, xóa OTP đã tạo
-      await this.prisma.passwordReset.deleteMany({
-        where: { email, otp },
-      });
-      throw new BadRequestException('Không thể gửi email. Vui lòng thử lại sau.');
-    }
+    // Dispatch mail sending in background to keep API response time low.
+    void this.emailService.sendResetPasswordEmail(email, otp, user.fullName || undefined).catch((error) => {
+      console.error('Failed to send reset-password OTP in background:', error);
+    });
+
+    return {
+      message: 'Mã OTP đang được gửi đến email của bạn. Vui lòng kiểm tra hộp thư.',
+      expiresIn: '15 phút',
+    };
   }
 
   /**

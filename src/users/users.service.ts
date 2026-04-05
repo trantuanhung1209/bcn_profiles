@@ -408,11 +408,9 @@ export class UsersService {
 
     await this.prisma.user.delete({ where: { id } });
 
-    try {
-      await this.emailService.sendRejectionEmail(user.email, user.fullName || undefined);
-    } catch (error) {
-      console.error('Failed to send rejection email:', error);
-    }
+    void this.emailService.sendRejectionEmail(user.email, user.fullName || undefined).catch((error) => {
+      console.error('Failed to send rejection email in background:', error);
+    });
   }
 
   async approveUser(id: string): Promise<UserWithoutPassword> {
@@ -441,12 +439,10 @@ export class UsersService {
       },
     });
 
-    try {
-      await this.emailService.sendApprovalEmail(user.email, user.fullName || undefined);
-    } catch (error) {
+    void this.emailService.sendApprovalEmail(user.email, user.fullName || undefined).catch((error) => {
       // Không rollback nếu gửi email lỗi — tài khoản vẫn được duyệt
-      console.error('Failed to send approval email:', error);
-    }
+      console.error('Failed to send approval email in background:', error);
+    });
 
     return updatedUser;
   }

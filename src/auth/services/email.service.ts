@@ -4,12 +4,16 @@ import { ConfigService } from '@nestjs/config';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as Handlebars from 'handlebars';
+import { MailQueueService } from './mail-queue.service';
 
 @Injectable()
 export class EmailService {
   private transporter: nodemailer.Transporter;
 
-  constructor(private configService: ConfigService) {
+  constructor(
+    private configService: ConfigService,
+    private readonly mailQueueService: MailQueueService,
+  ) {
     // Cấu hình transporter với thông tin từ .env
     this.transporter = nodemailer.createTransport({
       host: 'smtp.gmail.com',
@@ -24,6 +28,12 @@ export class EmailService {
         rejectUnauthorized: false,
       },
     } as any);
+  }
+
+  private async enqueueMail(name: string, mailOptions: nodemailer.SendMailOptions): Promise<void> {
+    await this.mailQueueService.enqueue(name, async () => {
+      await this.transporter.sendMail(mailOptions);
+    });
   }
 
   /**
@@ -66,7 +76,7 @@ export class EmailService {
     };
 
     try {
-      await this.transporter.sendMail(mailOptions);
+      await this.enqueueMail('reset-password-email', mailOptions);
     } catch (error) {
       console.error('Error sending email:', error);
       throw new Error('Không thể gửi email. Vui lòng thử lại sau.');
@@ -93,7 +103,7 @@ export class EmailService {
     };
 
     try {
-      await this.transporter.sendMail(mailOptions);
+      await this.enqueueMail('rejection-email', mailOptions);
     } catch (error) {
       console.error('Error sending rejection email:', error);
     }
@@ -121,7 +131,7 @@ export class EmailService {
     };
 
     try {
-      await this.transporter.sendMail(mailOptions);
+      await this.enqueueMail('approval-email', mailOptions);
     } catch (error) {
       console.error('Error sending approval email:', error);
       throw new Error('Không thể gửi email thông báo. Vui lòng thử lại sau.');
@@ -149,7 +159,7 @@ export class EmailService {
     };
 
     try {
-      await this.transporter.sendMail(mailOptions);
+      await this.enqueueMail('change-email-otp', mailOptions);
     } catch (error) {
       console.error('Error sending email:', error);
       throw new Error('Không thể gửi email. Vui lòng thử lại sau.');
@@ -180,7 +190,7 @@ export class EmailService {
     };
 
     try {
-      await this.transporter.sendMail(mailOptions);
+      await this.enqueueMail('two-factor-otp', mailOptions);
     } catch (error) {
       console.error('Error sending 2FA OTP email:', error);
       throw new Error('Không thể gửi email OTP. Vui lòng thử lại sau.');
@@ -215,7 +225,7 @@ export class EmailService {
     };
 
     try {
-      await this.transporter.sendMail(mailOptions);
+      await this.enqueueMail('two-factor-recovery-email', mailOptions);
     } catch (error) {
       console.error('Error sending 2FA recovery email:', error);
       throw new Error('Không thể gửi email khôi phục. Vui lòng thử lại sau.');
@@ -248,7 +258,7 @@ export class EmailService {
     };
 
     try {
-      await this.transporter.sendMail(mailOptions);
+      await this.enqueueMail('admin-reset-notification', mailOptions);
     } catch (error) {
       console.error('Error sending admin reset notification:', error);
       throw new Error('Không thể gửi email thông báo. Vui lòng thử lại sau.');

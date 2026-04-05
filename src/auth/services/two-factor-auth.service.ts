@@ -170,9 +170,6 @@ export class TwoFactorAuthService {
     // Generate 6-digit OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
-    // Send email
-    await this.emailService.sendTwoFactorOTP(email, otp);
-
     // Store in PasswordReset table (can be reused for OTP)
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
 
@@ -184,6 +181,11 @@ export class TwoFactorAuthService {
         expiresAt,
         isUsed: false,
       },
+    });
+
+    // Dispatch email sending in background so API does not wait for SMTP round-trip.
+    void this.emailService.sendTwoFactorOTP(email, otp).catch((error) => {
+      console.error('Failed to send 2FA OTP email in background:', error);
     });
 
     return otp; // Return for testing purposes, in production should not return

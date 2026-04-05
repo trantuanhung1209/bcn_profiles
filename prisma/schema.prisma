@@ -18,6 +18,9 @@ model PasswordReset {
   isUsed    Boolean  @default(false)
 
   @@index([email])
+  @@index([email, isUsed, createdAt(sort: Desc)])
+  @@index([email, otp, isUsed])
+  @@index([expiresAt])
 }
 
 model TokenBlacklist {
@@ -25,6 +28,8 @@ model TokenBlacklist {
   token     String   @unique
   createdAt DateTime @default(now())
   expiresAt DateTime
+
+  @@index([expiresAt])
 }
 
 model User {
@@ -47,6 +52,7 @@ model User {
   twoFactorRecoveryCodes    TwoFactorRecoveryCode[]
   timelineEvents            TimelineEvent[]
 
+  @@index([status, createdAt(sort: Desc)])
   @@map("users")
 }
 
@@ -74,6 +80,7 @@ model TwoFactorRecoveryCode {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  @@index([userId, isUsed])
   @@map("two_factor_recovery_codes")
 }
 
@@ -88,6 +95,7 @@ model TimelineEvent {
   user User @relation(fields: [userUuid], references: [id], onDelete: Cascade)
 
   @@index([userUuid])
+  @@index([userUuid, createdAt(sort: Desc)])
   @@map("timeline_events")
 }
 

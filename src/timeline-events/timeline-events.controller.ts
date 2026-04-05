@@ -6,12 +6,14 @@ import {
   Patch,
   Param,
   Delete,
+  Query,
   UseGuards,
   ParseIntPipe,
 } from '@nestjs/common';
 import { TimelineEventsService } from './timeline-events.service';
 import { CreateTimelineEventDto } from './dto/create-timeline-event.dto';
 import { UpdateTimelineEventDto } from './dto/update-timeline-event.dto';
+import { QueryTimelineEventsDto } from './dto/query-timeline-events.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -29,8 +31,8 @@ export class TimelineEventsController {
   }
 
   @Get('my-timeline')
-  findMyTimeline(@User('id') userId: string) {
-    return this.timelineEventsService.findAllByUser(userId);
+  findMyTimeline(@User('id') userId: string, @Query() query: QueryTimelineEventsDto) {
+    return this.timelineEventsService.findAllByUser(userId, query.page, query.limit);
   }
 
   @Get(':id')

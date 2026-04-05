@@ -71,12 +71,7 @@ export class TwoFactorAuthService {
    * Hash backup codes for storage
    */
   async hashBackupCodes(codes: string[]): Promise<string[]> {
-    const hashedCodes: string[] = [];
-    for (const code of codes) {
-      const hashed = await bcrypt.hash(code, 10);
-      hashedCodes.push(hashed);
-    }
-    return hashedCodes;
+    return Promise.all(codes.map((code) => bcrypt.hash(code, 10)));
   }
 
   /**
@@ -146,6 +141,7 @@ export class TwoFactorAuthService {
     // Get all unused backup codes
     const unusedCodes = await this.prismaService.twoFactorRecoveryCode.findMany({
       where: { userId, isUsed: false },
+      select: { id: true, code: true },
     });
 
     // Find and mark matching code as used
@@ -435,17 +431,18 @@ export class TwoFactorAuthService {
     enabled: boolean;
     backupCodesRemaining: number;
   }> {
-    const user = await this.prismaService.user.findUnique({
-      where: { id: userId },
-      select: { twoFactorEnabled: true },
-    });
-
-    const unusedBackupCodes = await this.prismaService.twoFactorRecoveryCode.count({
-      where: {
-        userId,
-        isUsed: false,
-      },
-    });
+    const [user, unusedBackupCodes] = await Promise.all([
+      this.prismaService.user.findUnique({
+        where: { id: userId },
+        select: { twoFactorEnabled: true },
+      }),
+      this.prismaService.twoFactorRecoveryCode.count({
+        where: {
+          userId,
+          isUsed: false,
+        },
+      }),
+    ]);
 
     return {
       enabled: user?.twoFactorEnabled || false,

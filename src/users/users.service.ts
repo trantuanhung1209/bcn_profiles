@@ -4,11 +4,10 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { User } from 'prisma/client/client';
+import { User, UserStatus } from 'prisma/client/client';
 import * as bcrypt from 'bcrypt';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { vietnameseIncludes } from '../common/utils/vietnamese.util';
 import { EmailService } from '../auth/services/email.service';
 
 export type UserWithoutPassword = Omit<User, 'password' | 'twoFactorEnabled' | 'totpSecret' | 'twoFactorRecoveryCodes'>;
@@ -48,6 +47,19 @@ export class UsersService {
     search?: string,
   ): Promise<PaginatedUsers> {
     const skip = (page - 1) * limit;
+    const normalizedSearch = search?.trim();
+    const where = {
+      status: UserStatus.PENDING,
+      ...(normalizedSearch
+        ? {
+            OR: [
+              { fullName: { contains: normalizedSearch, mode: 'insensitive' as const } },
+              { email: { contains: normalizedSearch, mode: 'insensitive' as const } },
+            ],
+          }
+        : {}),
+    };
+
     const select = {
       id: true,
       email: true,
@@ -66,6 +78,7 @@ export class UsersService {
         orderBy: {
           createdAt: 'desc',
         },
+        take: 5,
         select: {
           id: true,
           eventType: true,
@@ -76,43 +89,15 @@ export class UsersService {
       },
     } as const;
 
-    if (search) {
-      const allPending = await this.prisma.user.findMany({
-        where: { status: 'PENDING' },
-        select,
-        orderBy: { [sort]: order },
-      });
-
-      const filtered = allPending.filter((user) => {
-        const fullName = user.fullName || '';
-        const email = user.email || '';
-        return (
-          fullName.toLowerCase().includes(search.toLowerCase()) ||
-          email.toLowerCase().includes(search.toLowerCase()) ||
-          vietnameseIncludes(fullName, search) ||
-          vietnameseIncludes(email, search)
-        );
-      });
-
-      const total = filtered.length;
-      return {
-        data: filtered.slice(skip, skip + limit),
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-      };
-    }
-
     const [data, total] = await Promise.all([
       this.prisma.user.findMany({
-        where: { status: 'PENDING' },
+        where,
         skip,
         take: limit,
         select,
         orderBy: { [sort]: order },
       }),
-      this.prisma.user.count({ where: { status: 'PENDING' } }),
+      this.prisma.user.count({ where }),
     ]);
 
     return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
@@ -126,77 +111,20 @@ export class UsersService {
     search?: string,
   ): Promise<PaginatedUsers> {
     const skip = (page - 1) * limit;
-
-    if (search) {
-      // Với search tiếng Việt, lấy tất cả users và filter bằng code
-      const allUsers = await this.prisma.user.findMany({
-        select: {
-          id: true,
-          email: true,
-          fullName: true,
-          avatar: true,
-          phone: true,
-          metadata: true,
-          role: true,
-          status: true,
-          googleId: true,
-          typeAuth: true,
-          createdAt: true,
-          updatedAt: true,
-          password: false,
-          timelineEvents: {
-            orderBy: {
-              createdAt: 'desc',
-            },
-            select: {
-              id: true,
-              eventType: true,
-              title: true,
-              metadata: true,
-              createdAt: true,
-            },
-          },
-        },
-        orderBy: {
-          [sort]: order,
-        },
-      });
-
-      // Filter users theo search term (hỗ trợ tiếng Việt có dấu và không dấu)
-      const filteredUsers = allUsers.filter((user) => {
-        const searchLower = search.toLowerCase();
-        const fullName = user.fullName || '';
-        const email = user.email || '';
-
-        // Tìm kiếm thông thường (case-insensitive)
-        const normalMatch =
-          fullName.toLowerCase().includes(searchLower) ||
-          email.toLowerCase().includes(searchLower);
-
-        // Tìm kiếm bỏ dấu tiếng Việt
-        const vietnameseMatch =
-          vietnameseIncludes(fullName, search) ||
-          vietnameseIncludes(email, search);
-
-        return normalMatch || vietnameseMatch;
-      });
-
-      // Apply pagination sau khi filter
-      const total = filteredUsers.length;
-      const paginatedData = filteredUsers.slice(skip, skip + limit);
-
-      return {
-        data: paginatedData,
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-      };
-    }
+    const normalizedSearch = search?.trim();
+    const where = normalizedSearch
+      ? {
+          OR: [
+            { fullName: { contains: normalizedSearch, mode: 'insensitive' as const } },
+            { email: { contains: normalizedSearch, mode: 'insensitive' as const } },
+          ],
+        }
+      : undefined;
 
     // Nếu không có search, query bình thường
     const [data, total] = await Promise.all([
       this.prisma.user.findMany({
+        where,
         skip,
         take: limit,
         select: {
@@ -217,6 +145,7 @@ export class UsersService {
             orderBy: {
               createdAt: 'desc',
             },
+            take: 5,
             select: {
               id: true,
               eventType: true,
@@ -230,7 +159,7 @@ export class UsersService {
           [sort]: order,
         },
       }),
-      this.prisma.user.count(),
+      this.prisma.user.count({ where }),
     ]);
 
     return {
@@ -566,23 +495,19 @@ export class UsersService {
   }
 
   async searchUsers(query: string): Promise<{ id: string; fullName: string | null; avatar: string | null; metadata: any }[]> {
-    if (!query || query.trim() === '') return [];
+    const normalizedQuery = query?.trim();
+    if (!normalizedQuery) return [];
 
-    const allUsers = await this.prisma.user.findMany({
-      select: { id: true, fullName: true, email: true, avatar: true, metadata: true },
+    return this.prisma.user.findMany({
+      where: {
+        OR: [
+          { fullName: { contains: normalizedQuery, mode: 'insensitive' } },
+          { email: { contains: normalizedQuery, mode: 'insensitive' } },
+        ],
+      },
+      select: { id: true, fullName: true, avatar: true, metadata: true },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
     });
-
-    return allUsers
-      .filter((user) => {
-        const fullName = user.fullName || '';
-        const email = user.email || '';
-        return (
-          fullName.toLowerCase().includes(query.toLowerCase()) ||
-          email.toLowerCase().includes(query.toLowerCase()) ||
-          vietnameseIncludes(fullName, query) ||
-          vietnameseIncludes(email, query)
-        );
-      })
-      .map(({ id, fullName, avatar, metadata }) => ({ id, fullName, avatar, metadata }));
   }
 }

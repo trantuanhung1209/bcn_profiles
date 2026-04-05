@@ -22,10 +22,13 @@ export class TimelineEventsService {
     });
   }
 
-  async findAllByUser(userId: string) {
+  async findAllByUser(userId: string, page: number = 1, limit: number = 20) {
+    const skip = (page - 1) * limit;
     return this.prisma.timelineEvent.findMany({
       where: { userUuid: userId },
       orderBy: { createdAt: 'desc' },
+      skip,
+      take: limit,
     });
   }
 

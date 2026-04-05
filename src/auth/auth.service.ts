@@ -56,19 +56,14 @@ export class AuthService {
   async register(registerDto: RegisterDto) {
     const { email, password, fullName, avatar, phone } = registerDto;
 
-    // Kiểm tra xem email đã tồn tại chưa
-    const existingUser = await this.prisma.user.findUnique({
-      where: { email },
-    });
+    const [existingUser, existingPhone] = await Promise.all([
+      this.prisma.user.findUnique({ where: { email } }),
+      this.prisma.user.findUnique({ where: { phone } }),
+    ]);
 
     if (existingUser) {
       throw new ConflictException('Email đã được sử dụng');
     }
-
-    // Kiểm tra số điện thoại đã tồn tại chưa
-    const existingPhone = await this.prisma.user.findUnique({
-      where: { phone },
-    });
 
     if (existingPhone) {
       throw new ConflictException('Số điện thoại đã được sử dụng');
@@ -263,10 +258,13 @@ export class AuthService {
   async requestEmailChange(userId: string, dto: RequestEmailChangeDto) {
     const { newEmail } = dto;
 
-    const currentUser = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: { email: true, fullName: true },
-    });
+    const [currentUser, emailTaken] = await Promise.all([
+      this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { email: true, fullName: true },
+      }),
+      this.prisma.user.findUnique({ where: { email: newEmail } }),
+    ]);
 
     if (!currentUser) {
       throw new NotFoundException('Người dùng không tồn tại');
@@ -275,10 +273,6 @@ export class AuthService {
     if (currentUser.email === newEmail) {
       throw new BadRequestException('Email mới phải khác email hiện tại');
     }
-
-    const emailTaken = await this.prisma.user.findUnique({
-      where: { email: newEmail },
-    });
 
     if (emailTaken) {
       throw new ConflictException('Email đã được sử dụng bởi tài khoản khác');

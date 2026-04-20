@@ -241,11 +241,6 @@ export class UsersService {
       throw new NotFoundException(`User với ID ${id} không tồn tại`);
     }
 
-    // Chỉ cho phép xem profile của user ACTIVE
-    if (user.status !== 'ACTIVE') {
-      throw new NotFoundException(`User với ID ${id} không tồn tại`);
-    }
-
     return user;
   }
 

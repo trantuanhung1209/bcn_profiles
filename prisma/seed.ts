@@ -644,9 +644,10 @@ async function main() {
   // Danh sách maSV của các user cần set ACTIVE (thêm maSV vào đây)
   const activeUserMaSV = [
     '23659581', // Trần Tuấn Hưng - ví dụ
-    '24635361', // Nguyễn Lê Hữu Hân - ví dụ
+    '24635361',
     '22666271',
     '22058191',
+    
 
   ];
 

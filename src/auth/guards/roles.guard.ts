@@ -1,10 +1,12 @@
-import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from '@nestjs/common';
+import { Injectable, CanActivate, ExecutionContext, ForbiddenException, Logger } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Role } from '../enums/role.enum';
 import { ROLES_KEY } from '../decorators/roles.decorator';
 
 @Injectable()
 export class RolesGuard implements CanActivate {
+  private readonly logger = new Logger(RolesGuard.name);
+
   constructor(private reflector: Reflector) {}
 
   canActivate(context: ExecutionContext): boolean {
@@ -14,7 +16,7 @@ export class RolesGuard implements CanActivate {
       context.getClass(),
     ]);
 
-    console.log('🔐 Required roles:', requiredRoles);
+    this.logger.debug(`Required roles: ${requiredRoles?.join(',') ?? 'none'}`);
 
     // Nếu không có roles được yêu cầu, cho phép truy cập
     if (!requiredRoles) {
@@ -24,8 +26,7 @@ export class RolesGuard implements CanActivate {
     // Lấy user từ request (đã được gắn bởi JwtAuthGuard)
     const { user } = context.switchToHttp().getRequest();
 
-    console.log('👤 User from request:', user);
-    console.log('🎭 User role:', user?.role);
+    this.logger.debug(`User role from request: ${user?.role ?? 'none'}`);
 
     // Kiểm tra nếu không có user
     if (!user) {
@@ -35,7 +36,7 @@ export class RolesGuard implements CanActivate {
     // Kiểm tra xem role của user có trong danh sách roles được yêu cầu không
     const hasRole = requiredRoles.some((role) => user.role === role);
 
-    console.log('✅ Has required role:', hasRole);
+    this.logger.debug(`Has required role: ${hasRole}`);
 
     if (!hasRole) {
       throw new ForbiddenException(`Bạn không có quyền truy cập tài nguyên này. Cần role: ${requiredRoles.join(', ')}, nhưng bạn có role: ${user.role}`);

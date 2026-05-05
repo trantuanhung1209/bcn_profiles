@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   ConflictException,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { User, UserStatus } from 'prisma/client/client';
@@ -34,6 +35,8 @@ export interface PaginatedUsers {
 
 @Injectable()
 export class UsersService {
+  private readonly logger = new Logger(UsersService.name);
+
   constructor(
     private prisma: PrismaService,
     private emailService: EmailService,
@@ -333,7 +336,7 @@ export class UsersService {
     await this.prisma.user.delete({ where: { id } });
 
     void this.emailService.sendRejectionEmail(user.email, user.fullName || undefined).catch((error) => {
-      console.error('Failed to send rejection email in background:', error);
+      this.logger.error('Failed to send rejection email in background', error instanceof Error ? error.stack : undefined);
     });
   }
 
@@ -365,7 +368,7 @@ export class UsersService {
 
     void this.emailService.sendApprovalEmail(user.email, user.fullName || undefined).catch((error) => {
       // Không rollback nếu gửi email lỗi — tài khoản vẫn được duyệt
-      console.error('Failed to send approval email in background:', error);
+      this.logger.error('Failed to send approval email in background', error instanceof Error ? error.stack : undefined);
     });
 
     return updatedUser;

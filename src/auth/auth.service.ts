@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException, ConflictException, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, ConflictException, BadRequestException, NotFoundException, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
@@ -14,6 +14,8 @@ import { TwoFactorAuthService } from './services/two-factor-auth.service';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
@@ -298,7 +300,7 @@ export class AuthService {
     });
 
     void this.emailService.sendChangeEmailOtp(newEmail, otp, currentUser.fullName || undefined).catch((error) => {
-      console.error('Failed to send change-email OTP in background:', error);
+      this.logger.error('Failed to send change-email OTP in background', error instanceof Error ? error.stack : undefined);
     });
 
     return {
@@ -406,7 +408,7 @@ export class AuthService {
 
     // Dispatch mail sending in background to keep API response time low.
     void this.emailService.sendResetPasswordEmail(email, otp, user.fullName || undefined).catch((error) => {
-      console.error('Failed to send reset-password OTP in background:', error);
+      this.logger.error('Failed to send reset-password OTP in background', error instanceof Error ? error.stack : undefined);
     });
 
     return {

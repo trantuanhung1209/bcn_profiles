@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
 import { ConfigService } from '@nestjs/config';
 import * as fs from 'fs';
@@ -7,6 +7,7 @@ import * as Handlebars from 'handlebars';
 
 @Injectable()
 export class EmailService {
+  private readonly logger = new Logger(EmailService.name);
   private transporter: nodemailer.Transporter;
 
   constructor(private configService: ConfigService) {
@@ -62,7 +63,7 @@ export class EmailService {
     try {
       await this.transporter.sendMail(mailOptions);
     } catch (error) {
-      console.error('Error sending email:', error);
+      this.logger.error('Error sending email', error instanceof Error ? error.stack : undefined);
       throw new Error('Không thể gửi email. Vui lòng thử lại sau.');
     }
   }

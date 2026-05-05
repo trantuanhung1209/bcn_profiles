@@ -1,9 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Cron, CronExpression } from '@nestjs/schedule';
 
 @Injectable()
 export class TokenBlacklistService {
+  private readonly logger = new Logger(TokenBlacklistService.name);
+
   constructor(private prisma: PrismaService) {}
 
   /**
@@ -22,7 +24,7 @@ export class TokenBlacklistService {
       },
     });
 
-    console.log(`🚫 Token added to blacklist, expires at: ${expiresAt}`);
+    this.logger.log(`Token added to blacklist, expires at: ${expiresAt.toISOString()}`);
   }
 
   /**
@@ -64,7 +66,7 @@ export class TokenBlacklistService {
       },
     });
 
-    console.log(`🧹 Cleaned up ${result.count} expired tokens from blacklist`);
+    this.logger.log(`Cleaned up ${result.count} expired tokens from blacklist`);
   }
 
   /**

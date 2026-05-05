@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, UnauthorizedException } from '@nestjs/common';
+import { Injectable, BadRequestException, UnauthorizedException, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as speakeasy from 'speakeasy';
@@ -9,6 +9,8 @@ import { EmailService } from './email.service';
 
 @Injectable()
 export class TwoFactorAuthService {
+  private readonly logger = new Logger(TwoFactorAuthService.name);
+
   constructor(
     private readonly prismaService: PrismaService,
     private readonly emailService: EmailService,
@@ -181,7 +183,7 @@ export class TwoFactorAuthService {
 
     // Dispatch email sending in background so API does not wait for SMTP round-trip.
     void this.emailService.sendTwoFactorOTP(email, otp).catch((error) => {
-      console.error('Failed to send 2FA OTP email in background:', error);
+      this.logger.error('Failed to send 2FA OTP email in background', error instanceof Error ? error.stack : undefined);
     });
 
     return otp; // Return for testing purposes, in production should not return

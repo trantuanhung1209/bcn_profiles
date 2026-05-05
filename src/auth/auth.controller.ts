@@ -12,6 +12,7 @@ import {
   Inject,
   BadRequestException,
   Headers,
+  Logger,
 } from '@nestjs/common';
 import type { CookieOptions, Response } from 'express';
 import { AuthService } from './auth.service';
@@ -42,6 +43,8 @@ import { PrismaService } from '../prisma/prisma.service';
 
 @Controller('auth')
 export class AuthController {
+  private readonly logger = new Logger(AuthController.name);
+
   private readonly isProduction = process.env.NODE_ENV === 'production';
 
   private get baseCookieOptions(): CookieOptions {
@@ -693,8 +696,7 @@ export class AuthController {
     @Body() dto: AdminResetTwoFactorDto,
     @User() adminUser: any,
   ) {
-    // Log admin action for audit
-    console.log(`Admin ${adminUser.email} is resetting 2FA for user ${userId}. Reason: ${dto.reason || 'Not provided'}`);
+    this.logger.log(`Admin ${adminUser.email} is resetting 2FA for user ${userId}. Reason: ${dto.reason || 'Not provided'}`);
 
     // Disable 2FA for user
     await this.twoFactorAuthService.disableTwoFactor(userId, `Admin reset by ${adminUser.email}: ${dto.reason || 'No reason provided'}`);
@@ -703,7 +705,7 @@ export class AuthController {
     const userData = await this.authService.getProfile(userId);
     if (userData) {
       void this.emailService.sendAdminResetNotification(userData.email, userData.fullName || undefined).catch((error) => {
-        console.error('Failed to send admin reset notification in background:', error);
+        this.logger.error('Failed to send admin reset notification in background', error instanceof Error ? error.stack : undefined);
       });
     }
 

@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { Request } from 'express';
@@ -8,6 +8,8 @@ import { TokenBlacklistService } from '../services/token-blacklist.service';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
+  private readonly logger = new Logger(JwtStrategy.name);
+
   constructor(
     private prisma: PrismaService,
     private configService: ConfigService,
@@ -18,8 +20,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         (request: Request) => {
           // Trích xuất JWT từ cookie
           const token = request?.cookies?.access_token;
-          console.log('🔍 Cookies:', request?.cookies);
-          console.log('🔑 Token extracted:', token);
           return token;
         },
       ]),
@@ -31,7 +31,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
   async validate(request: Request, payload: any) {
     try {
-      console.log('🎯 JWT Payload:', payload);
+      this.logger.debug(`JWT payload received for user_id=${payload?.sub ?? 'unknown'}`);
       
       // Lấy token từ cookie
       const token = request?.cookies?.access_token;
@@ -40,7 +40,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       if (token) {
         const isBlacklisted = await this.tokenBlacklistService.isBlacklisted(token);
         if (isBlacklisted) {
-          console.log('🚫 Token is blacklisted');
+          this.logger.warn(`Blacklisted JWT rejected for user_id=${payload?.sub ?? 'unknown'}`);
           throw new UnauthorizedException('Token đã bị vô hiệu hóa. Vui lòng đăng nhập lại');
         }
       }
@@ -60,7 +60,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         },
       });
 
-      console.log('👤 User found:', user);
+      this.logger.debug(`JWT user lookup completed for user_id=${payload?.sub ?? 'unknown'} found=${Boolean(user)}`);
 
       if (!user) {
         throw new UnauthorizedException('Người dùng không tồn tại');
@@ -76,7 +76,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       // Return user với role để RolesGuard có thể check
       return user;
     } catch (error) {
-      console.error('❌ Validation error:', error);
+      this.logger.error('JWT validation failed', error instanceof Error ? error.stack : undefined);
       throw error;
     }
   }

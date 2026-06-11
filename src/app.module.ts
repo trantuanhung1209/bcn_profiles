@@ -27,7 +27,7 @@ import { createWinstonLoggerOptions } from './common/logging/winston.config';
       {
         name: 'default',
         ttl: 60000,   // 1 phút
-        limit: 60,    // 60 request/phút (mặc định toàn app)
+        limit: 300,    // 60 request/phút (mặc định toàn app)
       },
     ]),
     ScheduleModule.forRoot(),

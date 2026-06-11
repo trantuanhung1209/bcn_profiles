@@ -135,6 +135,7 @@ export class AuthController {
   }
 
   @Get('me')
+  @SkipThrottle()
   async getMe(@User() user: any) {
     return { user };
   }

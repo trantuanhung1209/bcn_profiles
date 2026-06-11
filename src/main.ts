@@ -28,7 +28,7 @@ async function bootstrap() {
   app.useGlobalInterceptors(app.get(RequestLoggingInterceptor), new ResponseInterceptor());
 
   app.enableCors({
-    origin: [/^https?:\/\/[^.]+\.uside\.studio$/, 'http://localhost:3000', 'http://localhost:5173', 'http://localhost:5500'],
+    origin: [/^https?:\/\/[^.]+\.uside\.studio$/, 'http://localhost:3000', 'http://localhost:5173', 'http://localhost:5500', 'https://profiles-uside-studio.vercel.app'],
     credentials: true,
   });
   

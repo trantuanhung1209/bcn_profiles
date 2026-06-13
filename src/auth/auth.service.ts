@@ -35,6 +35,7 @@ export class AuthService {
         role: true,
         status: true,
         twoFactorEnabled: true,
+        twoFactorRequired: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -108,9 +109,10 @@ export class AuthService {
   async login(user: any) {
     // Check 2FA status
     const twoFactorEnabled = user.twoFactorEnabled || false;
+    const twoFactorRequired = user.twoFactorRequired || false;
 
-    if (!twoFactorEnabled) {
-      // 2FA not enabled - force user to setup 2FA
+    // If 2FA is required but not enabled - force user to setup 2FA
+    if (twoFactorRequired && !twoFactorEnabled) {
       const setupToken = this.twoFactorAuthService.generateSetupToken(user.id, user.email);
       return {
         requiresTwoFactorSetup: true,
@@ -119,12 +121,21 @@ export class AuthService {
       };
     }
 
-    // 2FA is enabled - require verification
-    const verificationToken = this.twoFactorAuthService.generateVerificationToken(user.id, user.email);
+    // If 2FA is enabled - require verification
+    if (twoFactorEnabled) {
+      const verificationToken = this.twoFactorAuthService.generateVerificationToken(user.id, user.email);
+      return {
+        requiresTwoFactorVerification: true,
+        verificationToken,
+        message: 'Vui lòng xác nhận 2FA để hoàn tất đăng nhập.',
+      };
+    }
+
+    // 2FA is optional and not enabled - allow login without 2FA
     return {
-      requiresTwoFactorVerification: true,
-      verificationToken,
-      message: 'Vui lòng xác nhận 2FA để hoàn tất đăng nhập.',
+      requiresTwoFactorSetup: false,
+      requiresTwoFactorVerification: false,
+      skipTwoFactor: true,
     };
   }
 

@@ -6,59 +6,89 @@ A complete 2-Factor Authentication system with:
 - **Email OTP** as backup when app unavailable
 - **Backup codes** for emergency access
 - **Admin reset** capability for user support
-- **Mandatory for all users** - enforced on first login after setup requirement
+- **Optional 2FA** — users can voluntarily enable/disable 2FA when logged in
+- **Configurable 2FA requirement** — admin can set `twoFactorRequired` per user
+
+---
+
+## 2FA Configuration
+
+### User-Level Configuration
+Each user has two 2FA-related fields:
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `twoFactorEnabled` | Boolean | `false` | Whether user has completed 2FA setup |
+| `twoFactorRequired` | Boolean | `false` | Whether user MUST use 2FA (enforced by admin) |
+
+### Login Behavior Matrix
+
+| `twoFactorRequired` | `twoFactorEnabled` | Login Result |
+|---|---|---|
+| ❌ false | ❌ false | ✅ Allow direct login (skip 2FA) |
+| ❌ false | ✅ true | 🔒 Require 2FA verification |
+| ✅ true | ❌ false | ⚙️ Force 2FA setup first |
+| ✅ true | ✅ true | 🔒 Require 2FA verification |
 
 ---
 
 ## How It Works
 
-### User Journey
+### User Journey - NEW FLOW
 
-#### 1️⃣ New User/First Login (No 2FA Setup)
+#### 1️⃣ New User/First Login
 ```
 User Login (email + password)
     ↓
-Check 2FA Status
+Validate credentials
     ↓
-NOT ENABLED → Return setupToken
-    ↓
-Client receives: { requiresTwoFactorSetup: true, setupToken: "..." }
+Check twoFactorRequired flag
+    │
+    ├─ If twoFactorRequired = true
+    │   └─ Return { requiresTwoFactorSetup: true, setupToken }
+    │
+    └─ If twoFactorRequired = false
+        ├─ Check twoFactorEnabled
+        │   ├─ If true → Return { requiresTwoFactorVerification: true, verificationToken }
+        │   └─ If false → ✅ Allow direct login (skipTwoFactor: true)
+        │
+        └─ Tokens & user data returned directly
 ```
 
-#### 2️⃣ 2FA Setup Process
+#### 2️⃣ 2FA Setup Process (When Required)
 ```
 Step 1: POST /auth/2fa/setup/initiate
   - Require: setupToken (header), password (body)
   - Verify password for security
-  - Return: { secret, qrCode }
+  - Return: { secret, qrCode, setupToken (new, with secret embedded) }
 
 Step 2: Client scans QR code with Authenticator app
   - User's Authenticator app displays time-based codes
 
-Step 3: POST /auth/2fa/setup/verify
-  - Require: setupToken, secret, TOTP code from app
+Step 3: POST /auth/2fa/setup/confirm
+  - Require: setupToken (header), body: { secret, code }
   - Verify TOTP code against secret
-  - Return: { backupCodes: ["ABC123", "DEF456", ...] }
-
-Step 4: POST /auth/2fa/setup/confirm
-  - Require: setupToken, secret, backupCodes array
-  - Save TOTP secret to database
-  - Store backup codes for one-time use
-  - Return: { accessToken, refreshToken } ← User is now logged in!
+  - Generate backup codes server-side
+  - Save TOTP secret + backup codes to database
+  - Return: { backupCodes, user } + set access/refresh cookies
+  ← User is now logged in!
 ```
 
 #### 3️⃣ Subsequent Logins (2FA Enabled)
 ```
 User Login (email + password)
     ↓
-Check 2FA Status
+Validate credentials
     ↓
-ENABLED → Return verificationToken (5 min expiry)
-    ↓
-Client receives: { requiresTwoFactorVerification: true, verificationToken: "..." }
-    ↓
-User chooses verification method:
+Check twoFactorEnabled
+    ├─ If true → Return { requiresTwoFactorVerification: true, verificationToken }
+    └─ If false → Check twoFactorRequired
+        ├─ If true → Force setup (see step 2)
+        └─ If false → ✅ Allow direct login
+```
 
+#### 4️⃣ 2FA Verification Methods
+```
 Option A: TOTP from Authenticator App
   POST /auth/2fa/verify/totp
     - Header: Authorization: Bearer <verificationToken>
@@ -69,43 +99,76 @@ Option A: TOTP from Authenticator App
 Option B: Email OTP (if app unavailable)
   POST /auth/2fa/send-email-otp
     - Header: Authorization: Bearer <verificationToken>
-    - Body: {} (empty)
     - Action: Send 6-digit code to email
     - Return: success message
   
   Then: POST /auth/2fa/verify/email
     - Header: Authorization: Bearer <verificationToken>
     - Body: { code: "789012" }
-    - Verify OTP from email
     - Return: { accessToken, refreshToken }
 
 Option C: Backup Code (emergency)
   POST /auth/2fa/verify/backup-code
     - Header: Authorization: Bearer <verificationToken>
     - Body: { code: "ABC123" }
-    - Verify one-time backup code
     - Mark code as used
     - Return: { accessToken, refreshToken }
 ```
 
-#### 4️⃣ Lost smart Phone Recovery
+#### 5️⃣ User Self-Service 2FA (Voluntary Enable/Disable)
+
+User chủ động bật hoặc tắt 2FA khi đang đăng nhập — không cần admin can thiệp.
+
+**Bật 2FA:**
 ```
+Step 1: POST /auth/2fa/me/enable/initiate
+  - Require: access_token (JWT cookie), body: { password }
+  - Verify password
+  - Return: { secret, qrCode, setupToken (15 min) }
+
+Step 2: User scans QR with Authenticator app
+
+Step 3: POST /auth/2fa/me/enable/confirm
+  - Require: setupToken (header), body: { secret, code }
+  - Verify TOTP code
+  - Save to DB + generate backup codes
+  - Return: { backupCodes: [...10 codes...] }
+```
+
+**Tắt 2FA** (chỉ khi twoFactorRequired = false):
+```
+POST /auth/2fa/me/disable
+  - Require: access_token (JWT cookie)
+  - Body: { password, totpCode }
+  - Verify both password AND current TOTP code
+  - Return: { success: true }
+```
+
+**Xem trạng thái:**
+```
+GET /auth/2fa/me/status
+  - Require: access_token (JWT cookie)
+  - Return: { twoFactorEnabled, twoFactorRequired, backupCodesRemaining }
+```
+
+---
+
+#### 6️⃣ Lost Smart Phone Recovery```
 POST /auth/2fa/recovery/request
   - Body: { email: "user@example.com" }
   - Action: Send recovery OTP to email
   
 POST /auth/2fa/recovery/verify-email
   - Body: { email, recoveryOtp: "654321" }
-  - Verify email OTP
   - Return: { recoveryToken }
 
 POST /auth/2fa/recovery/reset
   - Header: Authorization: Bearer <recoveryToken>
   - Action: Disable 2FA for user
-  - User must setup 2FA again on next login
+  - User must setup 2FA again on next login (if required)
 ```
 
-#### 5️⃣ Admin Reset 2FA
+#### 7️⃣ Admin Reset 2FA
 ```
 POST /auth/2fa/admin/reset/:userId
   - Require: Admin role, userId in path
@@ -113,7 +176,7 @@ POST /auth/2fa/admin/reset/:userId
   - Action: 
     1. Disable user's 2FA
     2. Send email notification to user
-  - User must setup 2FA again on next login
+  - User must setup 2FA again on next login (if required)
 ```
 
 ---
@@ -144,8 +207,13 @@ POST /auth/2fa/admin/reset/:userId
 
 ---
 
-#### POST `/auth/2fa/setup/verify`
-**Requires**: setupToken
+#### POST `/auth/2fa/setup/confirm`
+**Requires**: setupToken (header) — bước cuối, verify TOTP + lưu DB + trả cookies + backup codes
+
+**Header**:
+```
+Authorization: Bearer <setupToken>
+```
 
 **Body**:
 ```json
@@ -159,43 +227,15 @@ POST /auth/2fa/admin/reset/:userId
 ```json
 {
   "success": true,
-  "backupCodes": [
-    "ABCD1234",
-    "EFGH5678",
-    "...10 codes total"
-  ],
-  "message": "Mã TOTP chính xác!",
-  "warningMessage": "QUAN TRỌNG: Lưu những mã này ở nơi an toàn"
-}
-```
-
----
-
-#### POST `/auth/2fa/setup/confirm`
-**Requires**: setupToken
-
-**Body**:
-```json
-{
-  "secret": "ABCD1234EFGH5678IJKL9012",
-  "backupCodes": [
-    "ABCD1234",
-    "EFGH5678",
-    "...array of backup codes"
-  ]
-}
-```
-
-**Response**:
-```json
-{
-  "success": true,
   "message": "2FA setup hoàn tất!",
-  "access_token": "eyJhbGciOiJIUzI1NiIs...",
-  "refresh_token": "eyJhbGciOiJIUzI1NiIs...",
+  "backupCodes": [
+    "ABCD1234", "EFGH5678", "...10 codes total"
+  ],
   "user": {...}
 }
 ```
+
+**Note**: Backup codes được generate server-side tại bước này. Cookie `access_token` + `refresh_token` được set — user đã đăng nhập.
 
 ---
 
@@ -309,6 +349,116 @@ Authorization: Bearer <verificationToken>
 
 ---
 
+### User Self-Service 2FA Endpoints
+
+#### GET `/auth/2fa/me/status`
+**Requires**: JWT cookie (đã đăng nhập)
+
+**Response**:
+```json
+{
+  "twoFactorEnabled": false,
+  "twoFactorRequired": false,
+  "backupCodesRemaining": 0
+}
+```
+
+---
+
+#### POST `/auth/2fa/me/enable/initiate`
+**Requires**: JWT cookie (đã đăng nhập)
+
+**Rate limit**: 3 requests / phút
+
+**Body**:
+```json
+{
+  "password": "current_password"
+}
+```
+
+**Response**:
+```json
+{
+  "success": true,
+  "secret": "BASE32SECRET...",
+  "qrCode": "data:image/png;base64,...",
+  "setupToken": "eyJ...",
+  "message": "Quét mã QR bằng ứng dụng Authenticator rồi gọi confirm để hoàn tất."
+}
+```
+
+**Note**: `setupToken` hết hạn sau 15 phút. Truyền vào header `Authorization: Bearer <setupToken>` ở bước tiếp theo.
+
+---
+
+#### POST `/auth/2fa/me/enable/confirm`
+**Public endpoint** — xác thực qua `setupToken` trong header
+
+**Rate limit**: 5 requests / phút
+
+**Header**:
+```
+Authorization: Bearer <setupToken>
+```
+
+**Body**:
+```json
+{
+  "secret": "BASE32SECRET...",
+  "code": "123456"
+}
+```
+
+**Response**:
+```json
+{
+  "success": true,
+  "backupCodes": [
+    "ABCD1234", "EFGH5678", "IJKL9012",
+    "MNOP3456", "QRST7890", "UVWX1234",
+    "YZA25678", "BCD39012", "EFG43456", "HIJ57890"
+  ],
+  "message": "2FA đã được bật thành công! Lưu các mã backup ở nơi an toàn.",
+  "warning": "Nếu mất thiết bị Authenticator, bạn sẽ cần các mã backup này để đăng nhập."
+}
+```
+
+---
+
+#### POST `/auth/2fa/me/disable`
+**Requires**: JWT cookie (đã đăng nhập)
+
+**Rate limit**: 3 requests / phút
+
+**Note**: Yêu cầu cả mật khẩu và mã TOTP hiện tại. Thất bại nếu admin đặt `twoFactorRequired = true`.
+
+**Body**:
+```json
+{
+  "password": "current_password",
+  "totpCode": "123456"
+}
+```
+
+**Response**:
+```json
+{
+  "success": true,
+  "message": "2FA đã được tắt. Tài khoản của bạn sẽ đăng nhập trực tiếp bằng email và mật khẩu."
+}
+```
+
+**Error (400)**:
+```json
+{
+  "statusCode": 400,
+  "message": "Tài khoản của bạn bắt buộc phải sử dụng 2FA. Liên hệ admin để gỡ yêu cầu này."
+}
+```
+
+---
+
 ### Recovery Endpoints
 
 #### POST `/auth/2fa/recovery/request`
@@ -371,14 +521,21 @@ Authorization: Bearer <verificationToken>
 
 ### Admin Endpoints
 
-#### GET `/auth/2fa/status/:userId`
+#### GET `/auth/2fa/admin/status/:userId`
 **Requires**: Admin role
 
 **Response**:
 ```json
 {
-  "enabled": true,
-  "backupCodesRemaining": 7
+  "userId": "user-id",
+  "email": "user@example.com",
+  "twoFactorEnabled": true,
+  "twoFactorRequired": false,
+  "backupCodesRemaining": 7,
+  "status": {
+    "setup": "✅ Đã setup",
+    "requirement": "✔️ Tuỳ chọn"
+  }
 }
 ```
 
@@ -386,6 +543,8 @@ Authorization: Bearer <verificationToken>
 
 #### POST `/auth/2fa/admin/reset/:userId`
 **Requires**: Admin role
+
+**Description**: Tắt 2FA cho user + ghi log + gửi email thông báo. Dùng khi user yêu cầu hỗ trợ.
 
 **Body**:
 ```json
@@ -405,14 +564,33 @@ Authorization: Bearer <verificationToken>
 
 ---
 
-#### POST `/auth/2fa/admin/disable/:userId`
+#### POST `/auth/2fa/admin/require/:userId`
 **Requires**: Admin role
+
+**Description**: Enforce 2FA requirement for a user. User will be forced to setup 2FA on next login.
 
 **Response**:
 ```json
 {
   "success": true,
-  "message": "2FA của user ... đã được vô hiệu hóa."
+  "message": "User ... bắt buộc phải sử dụng 2FA. User sẽ được thông báo via email.",
+  "userNotified": true
+}
+```
+
+---
+
+#### POST `/auth/2fa/admin/unrequire/:userId`
+**Requires**: Admin role
+
+**Description**: Make 2FA optional for a user. User can skip 2FA on login if not enabled.
+
+**Response**:
+```json
+{
+  "success": true,
+  "message": "User ... không bắt buộc phải sử dụng 2FA nữa. User sẽ được thông báo via email.",
+  "userNotified": true
 }
 ```
 
@@ -436,6 +614,7 @@ model User {
   status                    UserStatus
   // 2FA Fields
   twoFactorEnabled          Boolean                @default(false)
+  twoFactorRequired         Boolean                @default(false)  // NEW: Admin can enforce 2FA
   totpSecret                String?
   twoFactorRecoveryCodes    TwoFactorRecoveryCode[]
   timelineEvents            TimelineEvent[]
@@ -476,6 +655,7 @@ model TwoFactorRecoveryCode {
 ### ✅ User Experience
 - Simple 3-step setup process
 - Multiple 2FA verification options (TOTP, Email OTP, Backup codes)
+- **User can self-enable or self-disable 2FA** while logged in
 - Clear recovery process when device lost
 - Email notifications for all security events
 
@@ -524,6 +704,7 @@ model TwoFactorRecoveryCode {
 - `src/auth/dto/confirm-two-factor-setup.dto.ts` - Setup confirm DTOs
 - `src/auth/dto/two-factor-recovery.dto.ts` - Recovery DTOs
 - `src/auth/dto/admin-reset-two-factor.dto.ts` - Admin reset DTOs
+- `src/auth/dto/enable-two-factor.dto.ts` - User self-service 2FA DTOs (`InitiateEnable2FADto`, `ConfirmEnable2FADto`, `Disable2FADto`)
 - `src/auth/templates/2fa-otp-verification.hbs` - OTP email template
 - `src/auth/templates/2fa-recovery-request.hbs` - Recovery email template
 - `src/auth/templates/2fa-admin-reset.hbs` - Admin reset email template
@@ -545,12 +726,19 @@ model TwoFactorRecoveryCode {
 
 ## Testing Checklist
 
-### Setup Flow
+### Setup Flow (Admin-enforced)
 - [ ] Login → Receive setupToken
 - [ ] Call setup/initiate → Get secret + QR code
 - [ ] Scan QR with Authenticator app
 - [ ] Call setup/verify with correct TOTP code → Get backup codes
 - [ ] Call setup/confirm → Receive access token, properly logged in
+
+### User Self-Service 2FA
+- [ ] GET /auth/2fa/me/status → View current 2FA state
+- [ ] POST /auth/2fa/me/enable/initiate (with password) → Get QR + setupToken
+- [ ] POST /auth/2fa/me/enable/confirm (with setupToken + TOTP) → 2FA enabled, receive backup codes
+- [ ] POST /auth/2fa/me/disable (with password + totpCode) → 2FA disabled
+- [ ] Attempt disable when twoFactorRequired=true → Receive 400 error
 
 ### Verification Flow
 - [ ] Login with 2FA enabled → Receive verificationToken
@@ -575,7 +763,6 @@ model TwoFactorRecoveryCode {
 2. **Audit logging**: Log all 2FA actions for security audit trail
 3. **SMS OTP**: Add SMS as backup method (integrate Twilio/AWS SNS)
 4. **WebAuthn**: Support biometric/hardware security keys
-5. **2FA enforcement**: Force specific user roles to have 2FA
-6. **Device trust**: Remember device for X days to skip 2FA
-7. **Backup code regeneration**: Allow users to get new backup codes
-8. **Session invalidation**: Auto-logout other sessions when 2FA reset
+5. **Device trust**: Remember device for X days to skip 2FA
+6. **Backup code regeneration**: Allow users to get new backup codes via self-service
+7. **Session invalidation**: Auto-logout other sessions when 2FA reset

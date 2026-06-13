@@ -265,4 +265,82 @@ export class EmailService {
       throw new Error('Không thể gửi email thông báo. Vui lòng thử lại sau.');
     }
   }
+
+  /**
+   * Gửi email thông báo 2FA bắt buộc
+   */
+  async sendTwoFactorEnforcedNotification(email: string, fullName?: string): Promise<void> {
+    const mailOptions = {
+      from: `"BCN Support" <${this.configService.get<string>('EMAIL_USER')}>`,
+      to: email,
+      subject: '⚠️ 2FA bắt buộc - BCN Profiles',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
+          <h2 style="color: #EF4444;">Thông báo: 2FA bắt buộc</h2>
+          <p>Xin chào${fullName ? ` <b>${fullName}</b>` : ''},</p>
+          <p>Admin của BCN Profiles đã yêu cầu bạn thiết lập xác thực 2 lớp (2FA) bắt buộc cho tài khoản của bạn.</p>
+          <p style="background-color: #fee2e2; padding: 12px; border-radius: 6px; margin: 16px 0; border-left: 4px solid #ef4444;">
+            <strong>🔒 Từ lần đăng nhập tiếp theo, bạn PHẢI thiết lập 2FA.</strong>
+          </p>
+          <p><strong>Các bước thiết lập 2FA:</strong></p>
+          <ol>
+            <li>Đăng nhập vào tài khoản của bạn</li>
+            <li>Truy cập phần cài đặt bảo mật</li>
+            <li>Thiết lập ứng dụng Authenticator (Google Authenticator, Authy, v.v.)</li>
+            <li>Lưu mã khôi phục ở nơi an toàn</li>
+          </ol>
+          <p>Nếu bạn có bất kỳ câu hỏi nào, vui lòng liên hệ với BCN Support.</p>
+          <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
+          <p style="font-size: 12px; color: #6b7280;">
+            © ${new Date().getFullYear()} BCN Profiles
+          </p>
+        </div>
+      `,
+    };
+
+    try {
+      await this.enqueueMail('2fa-enforced-notification', mailOptions);
+    } catch (error) {
+      this.logger.error('Error sending 2FA enforced notification', error instanceof Error ? error.stack : undefined);
+      throw new Error('Không thể gửi email thông báo. Vui lòng thử lại sau.');
+    }
+  }
+
+  /**
+   * Gửi email thông báo 2FA tùy chọn
+   */
+  async sendTwoFactorOptionalNotification(email: string, fullName?: string): Promise<void> {
+    const mailOptions = {
+      from: `"BCN Support" <${this.configService.get<string>('EMAIL_USER')}>`,
+      to: email,
+      subject: '✅ 2FA bây giờ tùy chọn - BCN Profiles',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
+          <h2 style="color: #10B981;">Thông báo: 2FA bây giờ tùy chọn</h2>
+          <p>Xin chào${fullName ? ` <b>${fullName}</b>` : ''},</p>
+          <p>Admin của BCN Profiles đã cập nhật yêu cầu bảo mật của bạn.</p>
+          <p style="background-color: #ecfdf5; padding: 12px; border-radius: 6px; margin: 16px 0; border-left: 4px solid #10b981;">
+            <strong>✔️ Xác thực 2 lớp (2FA) bây giờ là TÙY CHỌN cho tài khoản của bạn.</strong>
+          </p>
+          <p>Bạn có thể:</p>
+          <ul>
+            <li>Tiếp tục sử dụng 2FA để bảo vệ tài khoản của bạn</li>
+            <li>Bỏ qua 2FA và đăng nhập bình thường</li>
+          </ul>
+          <p>Lựa chọn bảo mật được quyết định bởi bạn. Nếu bạn muốn thiết lập 2FA để bảo vệ thêm, vui lòng truy cập cài đặt bảo mật.</p>
+          <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
+          <p style="font-size: 12px; color: #6b7280;">
+            © ${new Date().getFullYear()} BCN Profiles
+          </p>
+        </div>
+      `,
+    };
+
+    try {
+      await this.enqueueMail('2fa-optional-notification', mailOptions);
+    } catch (error) {
+      this.logger.error('Error sending 2FA optional notification', error instanceof Error ? error.stack : undefined);
+      throw new Error('Không thể gửi email thông báo. Vui lòng thử lại sau.');
+    }
+  }
 }

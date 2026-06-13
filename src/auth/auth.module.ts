@@ -22,7 +22,7 @@ import { TwoFactorRecoveryGuard } from './guards/two-factor-recovery.guard';
   imports: [
     PrismaModule,
     PassportModule,
-    ThrottlerModule.forRoot([{ ttl: 60000, limit: 5 }]),
+    ThrottlerModule.forRoot([{ ttl: 60000, limit: 50 }]),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({

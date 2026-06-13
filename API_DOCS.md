@@ -1,25 +1,33 @@
-# API Documentation - BCN Profiles
+# API Documentation — BCN Profiles
 
-Base URL: `https://your-domain.com/api`
+**Base URL:** `https://profiles.uside.studio`
 
-## 📋 Mục lục
-
-- [Authentication APIs](#authentication-apis)
-- [User Management APIs](#user-management-apis)
-- [Timeline Events APIs](#timeline-events-apis)
-- [Common Errors](#common-errors)
+> Tất cả request/response đều là JSON (`Content-Type: application/json`).  
+> Authentication sử dụng **HttpOnly cookie** — FE phải gửi kèm `credentials: 'include'` (fetch) hoặc `withCredentials: true` (axios).
 
 ---
 
-## 🔐 Authentication APIs
+## 📋 Mục lục
 
-### 1. Đăng ký tài khoản
+- [Authentication](#-authentication)
+- [2FA — Luồng chi tiết](#-2fa--luồng-chi-tiết)
+- [2FA — Endpoints](#-2fa--endpoints)
+- [Users](#-users)
+- [Timeline Events](#-timeline-events)
+- [Cookies & Tokens](#-cookies--tokens)
+- [Lỗi thường gặp](#-lỗi-thường-gặp)
+- [Rate Limits](#-rate-limits)
 
-**POST** `/auth/register`
+---
 
-**Public endpoint** - Không cần authentication
+## 🔐 Authentication
 
-**Rate limit:** 5 requests / phút
+### POST `/auth/register`
+
+Đăng ký tài khoản mới. Tài khoản được tạo với `status: PENDING` và phải chờ admin phê duyệt trước khi đăng nhập được.
+
+**Auth:** Public  
+**Rate limit:** 50 req / phút
 
 **Request Body:**
 ```json
@@ -28,50 +36,45 @@ Base URL: `https://your-domain.com/api`
   "password": "password123",
   "fullName": "Nguyễn Văn A",
   "phone": "0912345678",
-  "avatar": "https://example.com/avatar.jpg" // Optional
+  "avatar": "https://example.com/avatar.jpg"
 }
 ```
 
-**Validation:**
-- Email: phải là email hợp lệ
-- Password: tối thiểu 6 ký tự
-- FullName: 2-50 ký tự
-- Phone: số điện thoại Việt Nam hợp lệ (0912345678 hoặc +84912345678)
+| Field | Bắt buộc | Validation |
+|---|---|---|
+| `email` | ✅ | Email hợp lệ |
+| `password` | ✅ | Tối thiểu 6 ký tự |
+| `fullName` | ✅ | 2–50 ký tự |
+| `phone` | ✅ | Số VN hợp lệ (`0912345678` hoặc `+84912345678`) |
+| `avatar` | ❌ | URL hợp lệ |
 
-**Success Response (201):**
+**Success (201):**
 ```json
 {
-  "message": "Đăng ký thành công. Vui lòng chờ admin phê duyệt.",
+  "message": "Đăng ký thành công. Tài khoản đang chờ admin phê duyệt, bạn sẽ nhận được email thông báo khi được duyệt.",
   "user": {
-    "id": "uuid-string",
+    "id": "uuid",
     "email": "user@example.com",
     "fullName": "Nguyễn Văn A",
+    "avatar": null,
     "phone": "0912345678",
     "status": "PENDING",
-    "role": "USER",
-    "createdAt": "2024-01-01T00:00:00.000Z"
+    "createdAt": "2026-01-01T00:00:00.000Z"
   }
 }
 ```
 
-**Error Response (400):**
-```json
-{
-  "statusCode": 400,
-  "message": "Email đã tồn tại",
-  "error": "Bad Request"
-}
-```
+**Errors:**
+- `409` — Email hoặc số điện thoại đã được sử dụng
 
 ---
 
-### 2. Đăng nhập
+### POST `/auth/login`
 
-**POST** `/auth/login`
+Đăng nhập bằng email và mật khẩu. Response có 3 dạng tuỳ trạng thái 2FA của tài khoản — xem [2FA — Luồng chi tiết](#-2fa--luồng-chi-tiết).
 
-**Public endpoint**
-
-**Rate limit:** 5 requests / phút
+**Auth:** Public  
+**Rate limit:** 50 req / phút
 
 **Request Body:**
 ```json
@@ -81,125 +84,148 @@ Base URL: `https://your-domain.com/api`
 }
 ```
 
-**Success Response (200):**
+**Success (200) — Trường hợp 1: Không có 2FA**
+
+Cookie `access_token` + `refresh_token` được set ngay.
 ```json
 {
-  "message": "Đăng nhập thành công"
+  "message": "Đăng nhập thành công (2FA không bắt buộc)",
+  "user": {
+    "id": "uuid",
+    "email": "user@example.com",
+    "fullName": "Nguyễn Văn A",
+    "avatar": null,
+    "role": "USER"
+  },
+  "skipTwoFactor": true
 }
 ```
 
-**Cookies được set:**
-- `access_token`: JWT token (expires: 60 phút)
-- `refresh_token`: JWT refresh token (expires: 7 ngày)
+**Success (200) — Trường hợp 2: User đã bật 2FA**
 
-**Error Response (401):**
+Không có cookie. Client dùng `verificationToken` để xác minh 2FA.
 ```json
 {
-  "statusCode": 401,
-  "message": "Email hoặc mật khẩu không đúng"
+  "requiresTwoFactorVerification": true,
+  "verificationToken": "eyJ...",
+  "message": "Vui lòng xác nhận 2FA để hoàn tất đăng nhập."
+}
+```
+
+**Success (200) — Trường hợp 3: Admin bắt buộc 2FA nhưng user chưa setup**
+
+Không có cookie. Client dùng `setupToken` để đi qua setup flow.
+```json
+{
+  "requiresTwoFactorSetup": true,
+  "setupToken": "eyJ...",
+  "message": "Bạn phải cài đặt xác thực 2 lớp (2FA) để tiếp tục."
+}
+```
+
+**Errors:**
+- `401` — Sai email/mật khẩu
+- `401` — Tài khoản đang chờ duyệt (`PENDING`) hoặc đã bị khóa (`BLOCKED`)
+
+---
+
+### GET `/auth/profile`
+
+Lấy thông tin profile đầy đủ của user đang đăng nhập từ database.
+
+**Auth:** JWT cookie  
+**Rate limit:** default
+
+**Success (200):**
+```json
+{
+  "id": "uuid",
+  "email": "user@example.com",
+  "fullName": "Nguyễn Văn A",
+  "avatar": "https://example.com/avatar.jpg",
+  "role": "USER",
+  "createdAt": "2026-01-01T00:00:00.000Z",
+  "updatedAt": "2026-01-01T00:00:00.000Z"
 }
 ```
 
 ---
 
-### 3. Đăng xuất
+### GET `/auth/me`
 
-**POST** `/auth/logout`
+Lấy thông tin user từ JWT payload (không truy vấn DB). Dùng để kiểm tra nhanh trạng thái đăng nhập.
 
-**Requires:** Authentication (access_token cookie)
+**Auth:** JWT cookie  
+**Rate limit:** Không giới hạn
 
-**Success Response (200):**
+**Success (200):**
+```json
+{
+  "user": {
+    "id": "uuid",
+    "email": "user@example.com",
+    "role": "USER",
+    "iat": 1234567890,
+    "exp": 1234571490
+  }
+}
+```
+
+> **Lưu ý:** Đây là JWT payload — không phải dữ liệu DB. Dùng `GET /auth/profile` nếu cần dữ liệu mới nhất.
+
+---
+
+### POST `/auth/logout`
+
+Đăng xuất. Xóa cookies và thêm `access_token` hiện tại vào blacklist (không dùng được nữa dù chưa hết hạn).
+
+**Auth:** JWT cookie  
+**Rate limit:** default
+
+**Success (200):**
 ```json
 {
   "message": "Đăng xuất thành công"
 }
 ```
 
-**Note:** Cookies sẽ bị xóa và access token sẽ được thêm vào blacklist
-
 ---
 
-### 4. Refresh Token
+### POST `/auth/refresh`
 
-**POST** `/auth/refresh`
+Làm mới `access_token` dùng `refresh_token` còn trong cookie. Gọi endpoint này khi nhận được lỗi `401` từ bất kỳ API nào.
 
-**Public endpoint** - Nhưng cần refresh_token cookie
+**Auth:** Public (đọc `refresh_token` cookie tự động)  
+**Rate limit:** 100 req / phút
 
-**Rate limit:** 10 requests / phút
+**Success (200):**
 
-**Success Response (200):**
+Cookie `access_token` + `refresh_token` được cập nhật.
 ```json
 {
   "message": "Làm mới token thành công",
   "user": {
-    "id": "uuid-string",
+    "id": "uuid",
     "email": "user@example.com",
     "fullName": "Nguyễn Văn A",
-    "role": "USER"
+    "avatar": null,
+    "role": "USER",
+    "status": "ACTIVE"
   }
 }
 ```
 
-**Cookies được cập nhật:**
-- `access_token`: Token mới (expires: 60 phút)
-- `refresh_token`: Token mới (expires: 7 ngày)
+**Errors:**
+- `401` — Không có refresh token, token không hợp lệ, hoặc tài khoản bị khóa/chờ duyệt
 
 ---
 
-### 5. Lấy thông tin profile
+### POST `/auth/forgot-password`
 
-**GET** `/auth/profile`
+Gửi OTP 6 chữ số đến email để reset mật khẩu. OTP có hiệu lực 15 phút.
 
-**Requires:** Authentication
-
-**Success Response (200):**
-```json
-{
-  "id": "uuid-string",
-  "email": "user@example.com",
-  "fullName": "Nguyễn Văn A",
-  "avatar": "https://example.com/avatar.jpg",
-  "phone": "0912345678",
-  "role": "USER",
-  "status": "ACTIVE",
-  "createdAt": "2024-01-01T00:00:00.000Z",
-  "updatedAt": "2024-01-01T00:00:00.000Z",
-  "metadata": {
-    "dateOfBirth": "1990-01-01",
-    "address": "Hà Nội"
-  }
-}
-```
-
----
-
-### 6. Lấy thông tin user hiện tại
-
-**GET** `/auth/me`
-
-**Requires:** Authentication
-
-**Success Response (200):**
-```json
-{
-  "user": {
-    "id": "uuid-string",
-    "email": "user@example.com",
-    "fullName": "Nguyễn Văn A",
-    "role": "USER"
-  }
-}
-```
-
----
-
-### 7. Quên mật khẩu
-
-**POST** `/auth/forgot-password`
-
-**Public endpoint**
-
-**Rate limit:** 3 requests / phút
+**Auth:** Public  
+**Rate limit:** 30 req / phút
 
 **Request Body:**
 ```json
@@ -208,24 +234,25 @@ Base URL: `https://your-domain.com/api`
 }
 ```
 
-**Success Response (200):**
+**Success (200):**
 ```json
 {
-  "message": "Email đặt lại mật khẩu đã được gửi. Vui lòng kiểm tra hộp thư."
+  "message": "Mã OTP đang được gửi đến email của bạn. Vui lòng kiểm tra hộp thư.",
+  "expiresIn": "15 phút"
 }
 ```
 
-**Note:** OTP sẽ được gửi qua email, có hiệu lực 15 phút
+**Errors:**
+- `404` — Email không tồn tại trong hệ thống
 
 ---
 
-### 8. Đặt lại mật khẩu
+### POST `/auth/reset-password`
 
-**POST** `/auth/reset-password`
+Đặt lại mật khẩu bằng OTP đã nhận qua email.
 
-**Public endpoint**
-
-**Rate limit:** 5 requests / phút
+**Auth:** Public  
+**Rate limit:** 50 req / phút
 
 **Request Body:**
 ```json
@@ -236,55 +263,53 @@ Base URL: `https://your-domain.com/api`
 }
 ```
 
-**Success Response (200):**
+**Success (200):**
 ```json
 {
-  "message": "Đặt lại mật khẩu thành công"
+  "message": "Đặt lại mật khẩu thành công. Bạn có thể đăng nhập với mật khẩu mới."
 }
 ```
 
-**Error Response (400):**
-```json
-{
-  "statusCode": 400,
-  "message": "OTP không hợp lệ hoặc đã hết hạn"
-}
-```
+**Errors:**
+- `400` — OTP không hợp lệ, đã dùng, hoặc hết hạn
+- `404` — Email không tồn tại
 
 ---
 
-### 9. Yêu cầu đổi email
+### POST `/auth/change-email/request`
 
-**POST** `/auth/change-email/request`
+Bước 1 của đổi email: gửi OTP đến địa chỉ email mới để xác minh.
 
-**Requires:** Authentication
-
-**Rate limit:** 3 requests / 15 phút
+**Auth:** JWT cookie  
+**Rate limit:** 30 req / 15 phút
 
 **Request Body:**
 ```json
 {
-  "newEmail": "newemail@example.com",
-  "password": "currentpassword123"
+  "newEmail": "newemail@example.com"
 }
 ```
 
-**Success Response (200):**
+**Success (200):**
 ```json
 {
-  "message": "OTP đã được gửi đến email mới. Vui lòng kiểm tra và xác nhận."
+  "message": "Mã OTP đang được gửi đến newemail@example.com. Vui lòng kiểm tra hộp thư.",
+  "expiresIn": "15 phút"
 }
 ```
+
+**Errors:**
+- `400` — Email mới trùng email hiện tại
+- `409` — Email đã được dùng bởi tài khoản khác
 
 ---
 
-### 10. Xác nhận đổi email
+### POST `/auth/change-email/confirm`
 
-**POST** `/auth/change-email/confirm`
+Bước 2 của đổi email: xác nhận OTP và cập nhật email mới vào DB.
 
-**Requires:** Authentication
-
-**Rate limit:** 5 requests / 15 phút
+**Auth:** JWT cookie  
+**Rate limit:** 50 req / 15 phút
 
 **Request Body:**
 ```json
@@ -294,39 +319,41 @@ Base URL: `https://your-domain.com/api`
 }
 ```
 
-**Success Response (200):**
+**Success (200):**
 ```json
 {
-  "message": "Email đã được thay đổi thành công"
+  "message": "Cập nhật email thành công."
 }
 ```
 
----
-
-### 11. Đăng nhập Google
-
-**GET** `/auth/google`
-
-**Public endpoint**
-
-Redirect user đến trang đăng nhập Google OAuth
+**Errors:**
+- `400` — OTP không hợp lệ hoặc hết hạn
+- `409` — Email vừa bị đăng ký bởi người khác trong lúc chờ
 
 ---
 
-### 12. Google OAuth Callback
+### GET `/auth/google`
 
-**GET** `/auth/google/callback`
+Khởi tạo luồng đăng nhập Google OAuth. Trình duyệt sẽ được redirect đến trang đăng nhập của Google.
 
-**Public endpoint**
+**Auth:** Public
 
-Được gọi tự động bởi Google sau khi user cho phép
+> **Lưu ý:** Endpoint này redirect trực tiếp — không trả JSON. Dùng bằng cách mở URL trong trình duyệt hoặc `window.location.href`.
 
-**Success Response (200):**
+---
+
+### GET `/auth/google/callback`
+
+Callback tự động được gọi sau khi user xác nhận với Google. Không gọi trực tiếp từ FE.
+
+**Auth:** Public (xử lý bởi GoogleAuthGuard)
+
+**Success:** Cookie `access_token` + `refresh_token` được set.
 ```json
 {
   "message": "Đăng nhập Google thành công",
   "user": {
-    "id": "uuid-string",
+    "id": "uuid",
     "email": "user@gmail.com",
     "fullName": "Nguyễn Văn A",
     "avatar": "https://lh3.googleusercontent.com/...",
@@ -335,80 +362,686 @@ Redirect user đến trang đăng nhập Google OAuth
 }
 ```
 
+**Errors:**
+- `401` — Tài khoản đang chờ duyệt hoặc bị khóa
+- `401` — Email chưa có tài khoản: tự động tạo mới với `PENDING`, trả 401 luôn (phải chờ admin duyệt)
+
 ---
 
-## 👥 User Management APIs
+## 🔒 2FA — Luồng chi tiết
 
-### 1. Tìm kiếm users
+### Ma trận hành vi khi login
 
-**GET** `/users/search?q={query}`
+| `twoFactorRequired` | `twoFactorEnabled` | Kết quả |
+|---|---|---|
+| ❌ | ❌ | ✅ Đăng nhập thẳng — cookies được set ngay |
+| ❌ | ✅ | 🔑 Phải xác minh 2FA — trả `verificationToken` (5 phút) |
+| ✅ | ❌ | ⚙️ Phải setup 2FA — trả `setupToken` (15 phút) |
+| ✅ | ✅ | 🔑 Phải xác minh 2FA — trả `verificationToken` (5 phút) |
 
-**Requires:** Authentication
+---
 
-**Query Parameters:**
-- `q`: Chuỗi tìm kiếm (tên hoặc email)
+### Luồng A — Đăng nhập không có 2FA
 
-**Success Response (200):**
+```
+POST /auth/login  { email, password }
+  └─ skipTwoFactor: true → set cookies → done ✅
+```
+
+---
+
+### Luồng B — Xác minh 2FA khi login (user đã bật 2FA)
+
+```
+1. POST /auth/login
+   └─ { requiresTwoFactorVerification: true, verificationToken }
+
+2. Nếu cần OTP qua email (tùy chọn):
+   POST /auth/2fa/send-email-otp
+   Header: Authorization: Bearer <verificationToken>
+
+3. Xác minh bằng một trong ba cách:
+   POST /auth/2fa/verify/totp         body: { code: "123456" }
+   POST /auth/2fa/verify/email        body: { code: "789012" }
+   POST /auth/2fa/verify/backup-code  body: { code: "ABCD1234" }
+   Header: Authorization: Bearer <verificationToken>
+
+   └─ set cookies → done ✅
+```
+
+---
+
+### Luồng C — Bắt buộc setup 2FA khi login (admin enforce)
+
+```
+1. POST /auth/login
+   └─ { requiresTwoFactorSetup: true, setupToken }
+
+2. POST /auth/2fa/setup/initiate
+   Header: Authorization: Bearer <setupToken>
+   Body:   { password: "user_password" }
+   └─ { secret, qrCode, setupToken (mới, chứa secret) }
+   → User quét QR bằng app Authenticator
+
+3. POST /auth/2fa/setup/confirm
+   Header: Authorization: Bearer <setupToken mới>
+   Body:   { secret: "BASE32...", code: "123456" }
+   └─ { backupCodes: [...10 codes...], user } + set cookies → done ✅
+```
+
+---
+
+### Luồng D — User tự bật 2FA (khi đã đăng nhập)
+
+```
+1. POST /auth/2fa/me/enable/initiate
+   Cookie: access_token
+   Body:   { password: "user_password" }
+   └─ { secret, qrCode, setupToken }
+   → User quét QR bằng app Authenticator
+
+2. POST /auth/2fa/me/enable/confirm
+   Header: Authorization: Bearer <setupToken>
+   Body:   { secret: "BASE32...", code: "123456" }
+   └─ { backupCodes: [...10 codes...] } — không đổi cookie ✅
+```
+
+---
+
+### Luồng E — User tự tắt 2FA
+
+Chỉ khả dụng khi `twoFactorRequired = false`.
+
+```
+POST /auth/2fa/me/disable
+Cookie: access_token
+Body:   { password: "user_password", totpCode: "123456" }
+└─ { success: true } ✅
+```
+
+---
+
+### Luồng F — Khôi phục khi mất thiết bị Authenticator
+
+Dùng khi user không truy cập được app và đã dùng hết backup codes.
+
+```
+1. POST /auth/2fa/recovery/request
+   Body: { email: "user@example.com" }
+   └─ Gửi OTP đến email
+
+2. POST /auth/2fa/recovery/verify-email
+   Body: { email: "user@example.com", recoveryOtp: "654321" }
+   └─ { recoveryToken } — hết hạn sau 30 phút
+
+3. POST /auth/2fa/recovery/reset
+   Header: Authorization: Bearer <recoveryToken>
+   └─ 2FA bị tắt hoàn toàn → đăng nhập lại bình thường ✅
+      (nếu twoFactorRequired=true: phải đi lại Luồng C)
+```
+
+---
+
+### Luồng G — Admin quản lý 2FA của user
+
+```
+Xem trạng thái:
+GET  /auth/2fa/admin/status/:userId
+
+Bắt buộc user dùng 2FA (gửi email thông báo):
+POST /auth/2fa/admin/require/:userId
+
+Gỡ bắt buộc (gửi email thông báo):
+POST /auth/2fa/admin/unrequire/:userId
+
+Reset 2FA của user (audit log + email thông báo):
+POST /auth/2fa/admin/reset/:userId
+Body: { reason?: "User request recovery" }
+```
+
+---
+
+## 🔑 2FA — Endpoints
+
+### POST `/auth/2fa/setup/initiate`
+
+Bước 1 của setup flow (bị admin enforce): xác minh mật khẩu, tạo TOTP secret và QR code. Trả về `setupToken` mới có nhúng secret để dùng ở bước confirm.
+
+**Auth:** `setupToken` trong header (`Authorization: Bearer <setupToken>`)  
+**Rate limit:** 30 req / phút
+
+**Request Body:**
 ```json
 {
-  "users": [
-    {
-      "id": "uuid-string",
-      "email": "user@example.com",
-      "fullName": "Nguyễn Văn A",
-      "avatar": "https://example.com/avatar.jpg",
-      "role": "USER",
-      "status": "ACTIVE"
-    }
-  ]
+  "password": "current_password"
+}
+```
+
+**Success (200):**
+```json
+{
+  "success": true,
+  "secret": "BASE32SECRETSTRING...",
+  "qrCode": "data:image/png;base64,...",
+  "setupToken": "eyJ... (token mới, có chứa secret, hết hạn 15 phút)",
+  "message": "Quét mã QR bằng ứng dụng Authenticator (Google Authenticator, Authy, v.v.)"
+}
+```
+
+**Errors:**
+- `401` — Mật khẩu không đúng hoặc setupToken không hợp lệ/hết hạn
+
+---
+
+### POST `/auth/2fa/setup/confirm`
+
+Bước 2 của setup flow (bị admin enforce): xác minh TOTP, lưu vào DB, tạo backup codes, và cấp tokens để đăng nhập ngay.
+
+**Auth:** `setupToken` (có chứa secret) trong header  
+**Rate limit:** 30 req / phút
+
+**Request Body:**
+```json
+{
+  "secret": "BASE32SECRETSTRING...",
+  "code": "123456"
+}
+```
+
+**Success (200):**
+
+Cookie `access_token` + `refresh_token` được set.
+```json
+{
+  "success": true,
+  "message": "2FA setup hoàn tất! Tài khoản của bạn hiện đã được bảo vệ bằng 2FA.",
+  "backupCodes": [
+    "ABCD1234", "EFGH5678", "IJKL9012", "MNOP3456", "QRST7890",
+    "UVWX1234", "YZA25678", "BCD39012", "EFG43456", "HIJ57890"
+  ],
+  "user": { "id": "uuid", "email": "...", "fullName": "...", "avatar": null, "role": "USER" },
+  "securityTip": "Giữ mã backup ở nơi an toàn..."
+}
+```
+
+**Errors:**
+- `400` — Thiếu secret hoặc sai format base32
+- `401` — TOTP không đúng hoặc secret không khớp với setupToken
+
+> ⚠️ **Quan trọng:** Backup codes chỉ hiển thị **một lần duy nhất** ngay tại bước này. Hãy lưu lại trước khi đóng.
+
+---
+
+### POST `/auth/2fa/verify/totp`
+
+Xác minh 2FA bằng mã TOTP từ app Authenticator sau khi login.
+
+**Auth:** `verificationToken` trong header  
+**Rate limit:** 50 req / phút
+
+**Header:**
+```
+Authorization: Bearer <verificationToken>
+```
+
+**Request Body:**
+```json
+{
+  "code": "123456"
+}
+```
+
+**Success (200):**
+
+Cookie `access_token` + `refresh_token` được set.
+```json
+{
+  "success": true,
+  "message": "Đăng nhập thành công",
+  "user": { "id": "uuid", "email": "...", "fullName": "...", "avatar": null, "role": "USER" }
+}
+```
+
+**Errors:**
+- `401` — verificationToken không hợp lệ/hết hạn, mã TOTP sai, hoặc 2FA chưa được thiết lập
+
+---
+
+### POST `/auth/2fa/send-email-otp`
+
+Gửi OTP 6 chữ số đến email của user để dùng thay cho TOTP khi không có app Authenticator.
+
+**Auth:** `verificationToken` trong header  
+**Rate limit:** 30 req / 5 phút
+
+**Header:**
+```
+Authorization: Bearer <verificationToken>
+```
+
+**Success (200):**
+```json
+{
+  "success": true,
+  "message": "Mã OTP đã được gửi đến email của bạn"
+}
+```
+
+**Errors:**
+- `401` — verificationToken không hợp lệ/hết hạn
+
+---
+
+### POST `/auth/2fa/verify/email`
+
+Xác minh 2FA bằng OTP đã nhận qua email (dùng sau khi gọi `send-email-otp`).
+
+**Auth:** `verificationToken` trong header  
+**Rate limit:** 50 req / phút
+
+**Header:**
+```
+Authorization: Bearer <verificationToken>
+```
+
+**Request Body:**
+```json
+{
+  "code": "789012"
+}
+```
+
+**Success (200):**
+
+Cookie `access_token` + `refresh_token` được set.
+```json
+{
+  "success": true,
+  "message": "Đăng nhập thành công",
+  "user": { "id": "uuid", "email": "...", "fullName": "...", "avatar": null, "role": "USER" }
+}
+```
+
+**Errors:**
+- `401` — OTP không chính xác hoặc đã hết hạn (OTP có hiệu lực 15 phút)
+
+---
+
+### POST `/auth/2fa/verify/backup-code`
+
+Xác minh 2FA bằng backup code dự phòng. Mỗi code chỉ dùng được một lần.
+
+**Auth:** `verificationToken` trong header  
+**Rate limit:** 50 req / phút
+
+**Header:**
+```
+Authorization: Bearer <verificationToken>
+```
+
+**Request Body:**
+```json
+{
+  "code": "ABCD1234"
+}
+```
+
+**Success (200):**
+
+Cookie `access_token` + `refresh_token` được set.
+```json
+{
+  "success": true,
+  "message": "Đăng nhập thành công (sử dụng mã backup)",
+  "user": { "id": "uuid", "email": "...", "fullName": "...", "avatar": null, "role": "USER" },
+  "warningMessage": "Bạn chỉ còn lại một số ít mã backup. Hãy yêu cầu thêm mã."
+}
+```
+
+**Errors:**
+- `401` — Backup code sai hoặc đã được sử dụng trước đó
+
+---
+
+### POST `/auth/2fa/recovery/request`
+
+Gửi OTP khôi phục đến email để bắt đầu quá trình reset 2FA khi mất thiết bị. Response luôn thành công để không lộ thông tin email tồn tại hay không.
+
+**Auth:** Public  
+**Rate limit:** 20 req / 15 phút
+
+**Request Body:**
+```json
+{
+  "email": "user@example.com"
+}
+```
+
+**Success (200):**
+```json
+{
+  "success": true,
+  "message": "Nếu email tồn tại, bạn sẽ nhận được mã khôi phục. Vui lòng kiểm tra hộp thư.",
+  "nextStep": "Sử dụng mã để xác nhận yêu cầu khôi phục"
 }
 ```
 
 ---
 
-### 2. Lấy danh sách tất cả users
+### POST `/auth/2fa/recovery/verify-email`
 
-**GET** `/users`
+Xác minh OTP khôi phục và nhận `recoveryToken` để thực hiện reset 2FA.
 
-**Requires:** ADMIN role
+**Auth:** Public  
+**Rate limit:** 50 req / phút
 
-**Query Parameters:**
-- `page`: Số trang (default: 1)
-- `limit`: Số items mỗi trang (default: 10)
-- `sort`: Trường để sort (default: "createdAt")
-- `order`: Thứ tự sort "asc" hoặc "desc" (default: "desc")
-- `search`: Chuỗi tìm kiếm (optional)
+**Request Body:**
+```json
+{
+  "email": "user@example.com",
+  "recoveryOtp": "654321"
+}
+```
 
-**Example:** `/users?page=1&limit=10&sort=fullName&order=asc&search=nguyen`
+**Success (200):**
+```json
+{
+  "success": true,
+  "recoveryToken": "eyJ... (hết hạn sau 30 phút)",
+  "message": "Xác minh email thành công. Bây giờ bạn có thể reset 2FA.",
+  "nextStep": "Gọi endpoint reset 2FA recovery với recovery token này"
+}
+```
 
-**Success Response (200):**
+**Errors:**
+- `401` — OTP không đúng/hết hạn hoặc email không tồn tại
+
+---
+
+### POST `/auth/2fa/recovery/reset`
+
+Bước cuối của luồng khôi phục: tắt 2FA hoàn toàn. Sau đó user đăng nhập lại bình thường (nếu `twoFactorRequired = true` sẽ phải setup lại).
+
+**Auth:** `recoveryToken` trong header (`Authorization: Bearer <recoveryToken>`)  
+**Rate limit:** 30 req / phút
+
+**Success (200):**
+```json
+{
+  "success": true,
+  "message": "2FA đã được reset. Vui lòng đăng nhập lại để thiết lập 2FA mới.",
+  "nextStep": "Đăng nhập lại để hoàn tất quá trình thiết lập 2FA"
+}
+```
+
+**Errors:**
+- `401` — recoveryToken không hợp lệ hoặc hết hạn
+
+---
+
+### GET `/auth/2fa/me/status`
+
+Xem trạng thái 2FA hiện tại của bản thân.
+
+**Auth:** JWT cookie  
+**Rate limit:** Không giới hạn
+
+**Success (200):**
+```json
+{
+  "twoFactorEnabled": true,
+  "twoFactorRequired": false,
+  "backupCodesRemaining": 8
+}
+```
+
+---
+
+### POST `/auth/2fa/me/enable/initiate`
+
+Bước 1 của luồng tự bật 2FA: xác minh mật khẩu và nhận QR code. Chỉ dùng khi đã đăng nhập.
+
+**Auth:** JWT cookie  
+**Rate limit:** 30 req / phút
+
+**Request Body:**
+```json
+{
+  "password": "current_password"
+}
+```
+
+**Success (200):**
+```json
+{
+  "success": true,
+  "secret": "BASE32SECRETSTRING...",
+  "qrCode": "data:image/png;base64,...",
+  "setupToken": "eyJ... (hết hạn 15 phút)",
+  "message": "Quét mã QR bằng ứng dụng Authenticator rồi gọi confirm để hoàn tất."
+}
+```
+
+**Errors:**
+- `401` — Mật khẩu không đúng
+
+---
+
+### POST `/auth/2fa/me/enable/confirm`
+
+Bước 2 của luồng tự bật 2FA: xác minh TOTP, lưu DB, nhận backup codes. Không cấp token mới vì user đã đăng nhập sẵn.
+
+**Auth:** `setupToken` trong header (từ bước initiate)  
+**Rate limit:** 50 req / phút
+
+**Header:**
+```
+Authorization: Bearer <setupToken>
+```
+
+**Request Body:**
+```json
+{
+  "secret": "BASE32SECRETSTRING...",
+  "code": "123456"
+}
+```
+
+**Success (200):**
+```json
+{
+  "success": true,
+  "backupCodes": [
+    "ABCD1234", "EFGH5678", "IJKL9012", "MNOP3456", "QRST7890",
+    "UVWX1234", "YZA25678", "BCD39012", "EFG43456", "HIJ57890"
+  ],
+  "message": "2FA đã được bật thành công! Lưu các mã backup ở nơi an toàn.",
+  "warning": "Nếu mất thiết bị Authenticator, bạn sẽ cần các mã backup này để đăng nhập."
+}
+```
+
+**Errors:**
+- `400` — Secret không khớp với setupToken
+- `401` — Mã TOTP không đúng
+
+> ⚠️ Backup codes chỉ hiển thị **một lần duy nhất**. Lưu lại ngay.
+
+---
+
+### POST `/auth/2fa/me/disable`
+
+Tự tắt 2FA. Yêu cầu xác minh cả mật khẩu lẫn mã TOTP hiện tại để đảm bảo an toàn. Không thể tắt nếu admin đã đặt `twoFactorRequired = true` cho tài khoản.
+
+**Auth:** JWT cookie  
+**Rate limit:** 30 req / phút
+
+**Request Body:**
+```json
+{
+  "password": "current_password",
+  "totpCode": "123456"
+}
+```
+
+**Success (200):**
+```json
+{
+  "success": true,
+  "message": "2FA đã được tắt. Tài khoản của bạn sẽ đăng nhập trực tiếp bằng email và mật khẩu."
+}
+```
+
+**Errors:**
+- `400` — Tài khoản bắt buộc phải dùng 2FA (`twoFactorRequired = true`), phải liên hệ admin để gỡ
+- `401` — Mật khẩu hoặc mã TOTP không đúng
+
+---
+
+### POST `/auth/2fa/admin/reset/:userId`
+
+Tắt 2FA của một user cụ thể. Ghi audit log và gửi email thông báo đến user. Dùng khi user yêu cầu hỗ trợ mà không thể tự khôi phục.
+
+**Auth:** JWT cookie + ADMIN role  
+**Rate limit:** 50 req / phút
+
+**Request Body:**
+```json
+{
+  "reason": "User yêu cầu reset do mất thiết bị"
+}
+```
+
+**Success (200):**
+```json
+{
+  "success": true,
+  "message": "2FA của user <userId> đã được reset. User sẽ được thông báo via email.",
+  "userNotified": true
+}
+```
+
+---
+
+### POST `/auth/2fa/admin/require/:userId`
+
+Bắt buộc user phải sử dụng 2FA. User sẽ bị yêu cầu setup 2FA ở lần đăng nhập kế tiếp nếu chưa bật. Gửi email thông báo đến user.
+
+**Auth:** JWT cookie + ADMIN role  
+**Rate limit:** 50 req / phút
+
+**Success (200):**
+```json
+{
+  "success": true,
+  "message": "User <userId> bắt buộc phải sử dụng 2FA. User sẽ được thông báo via email.",
+  "userNotified": true
+}
+```
+
+**Errors:**
+- `404` — User không tồn tại
+
+---
+
+### POST `/auth/2fa/admin/unrequire/:userId`
+
+Gỡ bỏ yêu cầu bắt buộc 2FA, cho phép user tắt 2FA theo ý muốn. Gửi email thông báo đến user.
+
+**Auth:** JWT cookie + ADMIN role  
+**Rate limit:** 50 req / phút
+
+**Success (200):**
+```json
+{
+  "success": true,
+  "message": "User <userId> không bắt buộc phải sử dụng 2FA nữa. User sẽ được thông báo via email.",
+  "userNotified": true
+}
+```
+
+**Errors:**
+- `404` — User không tồn tại
+
+---
+
+### GET `/auth/2fa/admin/status/:userId`
+
+Xem trạng thái 2FA đầy đủ của một user.
+
+**Auth:** JWT cookie + ADMIN role  
+**Rate limit:** 100 req / phút
+
+**Success (200):**
+```json
+{
+  "userId": "uuid",
+  "email": "user@example.com",
+  "twoFactorEnabled": true,
+  "twoFactorRequired": false,
+  "backupCodesRemaining": 7,
+  "status": {
+    "setup": "✅ Đã setup",
+    "requirement": "✔️ Tuỳ chọn"
+  }
+}
+```
+
+**Errors:**
+- `404` — User không tồn tại
+
+---
+
+## 👥 Users
+
+Tất cả endpoints trong `/users` đều yêu cầu **JWT cookie**. Các endpoint ADMIN yêu cầu thêm `role: ADMIN`.
+
+---
+
+### GET `/users/search`
+
+Tìm kiếm user theo tên hoặc email. Trả tối đa 20 kết quả.
+
+**Auth:** JWT cookie  
+**Query:** `q` — chuỗi tìm kiếm
+
+**Success (200):**
 ```json
 {
   "users": [
+    { "id": "uuid", "fullName": "Nguyễn Văn A", "avatar": null, "metadata": {} }
+  ]
+}
+```
+
+> Trả về mảng rỗng nếu `q` trống.
+
+---
+
+### GET `/users`
+
+Lấy danh sách toàn bộ users với phân trang, sắp xếp và tìm kiếm. Kèm 5 timeline event gần nhất của mỗi user.
+
+**Auth:** JWT cookie + ADMIN  
+**Query:**
+
+| Param | Default | Mô tả |
+|---|---|---|
+| `page` | `1` | Số trang |
+| `limit` | `10` | Số item mỗi trang |
+| `sort` | `createdAt` | Field sắp xếp (`id`, `email`, `fullName`, `createdAt`, `updatedAt`, `role`) |
+| `order` | `desc` | `asc` hoặc `desc` |
+| `search` | — | Tìm theo tên hoặc email |
+
+**Success (200):**
+```json
+{
+  "data": [
     {
-      "id": "uuid-string",
-      "email": "user@example.com",
-      "fullName": "Nguyễn Văn A",
-      "avatar": "https://example.com/avatar.jpg",
-      "phone": "0912345678",
-      "role": "USER",
-      "status": "ACTIVE",
-      "createdAt": "2024-01-01T00:00:00.000Z",
+      "id": "uuid", "email": "...", "fullName": "...", "avatar": null,
+      "phone": "...", "metadata": {}, "role": "USER", "status": "ACTIVE",
+      "createdAt": "...", "updatedAt": "...",
       "timelineEvents": [
-        {
-          "id": 2,
-          "eventType": "COURSE_COMPLETE",
-          "title": "Hoàn thành khóa C",
-          "metadata": { "score": 95 },
-          "createdAt": "2024-05-15T00:00:00.000Z"
-        },
-        {
-          "id": 1,
-          "eventType": "JOIN_BCN",
-          "title": "Gia nhập BCN",
-          "metadata": {},
-          "createdAt": "2023-12-29T00:00:00.000Z"
-        }
+        { "id": 1, "eventType": "JOIN_BCN", "title": "...", "metadata": {}, "createdAt": "..." }
       ]
     }
   ],
@@ -421,43 +1054,21 @@ Redirect user đến trang đăng nhập Google OAuth
 
 ---
 
-### 3. Lấy danh sách users đang chờ duyệt
+### GET `/users/pending`
 
-**GET** `/users/pending`
+Lấy danh sách users đang chờ admin phê duyệt. Cùng format và query params với `GET /users`.
 
-**Requires:** ADMIN role
-
-**Query Parameters:** Giống như `/users`
-
-**Success Response (200):**
-```json
-{
-  "users": [
-    {
-      "id": "uuid-string",
-      "email": "user@example.com",
-      "fullName": "Nguyễn Văn A",
-      "phone": "0912345678",
-      "status": "PENDING",
-      "createdAt": "2024-01-01T00:00:00.000Z",
-      "timelineEvents": []
-    }
-  ],
-  "total": 5,
-  "page": 1,
-  "limit": 10
-}
-```
+**Auth:** JWT cookie + ADMIN
 
 ---
 
-### 4. Đếm số lượng users
+### GET `/users/count`
 
-**GET** `/users/count`
+Đếm tổng số users trong hệ thống.
 
-**Requires:** ADMIN role
+**Auth:** JWT cookie + ADMIN
 
-**Success Response (200):**
+**Success (200):**
 ```json
 {
   "count": 150
@@ -466,26 +1077,25 @@ Redirect user đến trang đăng nhập Google OAuth
 
 ---
 
-### 5. Tìm user theo email
+### GET `/users/email`
 
-**GET** `/users/email?email={email}`
+Tìm user theo địa chỉ email chính xác.
 
-**Requires:** ADMIN role
+**Auth:** JWT cookie + ADMIN  
+**Query:** `email` — địa chỉ email cần tìm
 
-**Success Response (200):**
+**Success (200):**
 ```json
 {
   "users": {
-    "id": "uuid-string",
-    "email": "user@example.com",
-    "fullName": "Nguyễn Văn A",
-    "role": "USER",
-    "status": "ACTIVE"
+    "id": "uuid", "email": "user@example.com", "fullName": "...",
+    "avatar": null, "phone": "...", "metadata": {},
+    "role": "USER", "status": "ACTIVE", "createdAt": "...", "updatedAt": "..."
   }
 }
 ```
 
-**Not Found (200):**
+Hoặc nếu không tìm thấy:
 ```json
 {
   "message": "User không tồn tại"
@@ -494,52 +1104,78 @@ Redirect user đến trang đăng nhập Google OAuth
 
 ---
 
-### 6. Lấy thông tin một user
+### GET `/users/me/profile`
 
-**GET** `/users/:id`
+Lấy thông tin của chính user đang đăng nhập từ JWT payload. Nhanh hơn `/auth/me` vì cùng nguồn dữ liệu.
 
-**Requires:** ADMIN role
+**Auth:** JWT cookie
 
-**Success Response (200):**
+**Success (200):**
 ```json
 {
-  "users": {
-    "id": "uuid-string",
-    "email": "user@example.com",
-    "fullName": "Nguyễn Văn A",
-    "avatar": "https://example.com/avatar.jpg",
-    "phone": "0912345678",
-    "role": "USER",
-    "status": "ACTIVE",
-    "createdAt": "2024-01-01T00:00:00.000Z",
-    "metadata": {},
-    "timelineEvents": [
-      {
-        "id": 2,
-        "eventType": "COURSE_COMPLETE",
-        "title": "Hoàn thành khóa C",
-        "metadata": { "score": 95 },
-        "createdAt": "2024-05-15T00:00:00.000Z"
-      },
-      {
-        "id": 1,
-        "eventType": "JOIN_BCN",
-        "title": "Gia nhập BCN",
-        "metadata": {},
-        "createdAt": "2023-12-29T00:00:00.000Z"
-      }
-    ]
-  }
+  "user": { "id": "uuid", "email": "...", "role": "USER", ... }
 }
 ```
 
 ---
 
-### 7. Tạo user mới
+### GET `/users/:id`
 
-**POST** `/users`
+Lấy thông tin đầy đủ của một user, bao gồm toàn bộ timeline events.
 
-**Requires:** ADMIN role
+**Auth:** JWT cookie + ADMIN
+
+**Success (200):**
+```json
+{
+  "users": {
+    "id": "uuid", "email": "...", "fullName": "...", "avatar": null,
+    "phone": "...", "metadata": {}, "role": "USER", "status": "ACTIVE",
+    "createdAt": "...", "updatedAt": "...",
+    "timelineEvents": [ ... ]
+  }
+}
+```
+
+**Errors:**
+- `404` — User không tồn tại
+
+---
+
+### GET `/users/:id/profile`
+
+Lấy profile công khai của một user khác. Không trả về thông tin nhạy cảm như `phone`, `metadata`, `googleId`.
+
+**Auth:** JWT cookie (bất kỳ role)
+
+**Success (200):**
+```json
+{
+  "user": {
+    "id": "uuid",
+    "email": "user@example.com",
+    "fullName": "Nguyễn Văn A",
+    "avatar": "https://...",
+    "role": "USER",
+    "status": "ACTIVE",
+    "createdAt": "2026-01-01T00:00:00.000Z",
+    "timelineEvents": [
+      { "id": 3, "eventType": "PROJECT_COMPLETE", "title": "...", "metadata": {}, "createdAt": "..." }
+    ]
+  }
+}
+```
+
+**Errors:**
+- `404` — User không tồn tại
+
+---
+
+### POST `/users`
+
+Tạo user mới (admin tạo hộ). User được tạo với `status: ACTIVE` ngay — không cần chờ duyệt.
+
+**Auth:** JWT cookie + ADMIN
 
 **Request Body:**
 ```json
@@ -548,631 +1184,343 @@ Redirect user đến trang đăng nhập Google OAuth
   "password": "password123",
   "fullName": "Trần Văn B",
   "phone": "0987654321",
-  "avatar": "https://example.com/avatar.jpg", // Optional
-  "role": "USER", // Optional: "USER" hoặc "ADMIN"
-  "status": "ACTIVE" // Optional: "PENDING", "ACTIVE", "BLOCKED"
+  "avatar": "https://...",
+  "metadata": {}
 }
 ```
 
-**Success Response (201):**
+| Field | Bắt buộc |
+|---|---|
+| `email` | ✅ |
+| `password` | ✅ (min 6) |
+| `fullName` | ❌ |
+| `phone` | ❌ |
+| `avatar` | ❌ |
+| `metadata` | ❌ |
+
+**Success (201):**
 ```json
 {
   "users": {
-    "id": "uuid-string",
-    "email": "newuser@example.com",
-    "fullName": "Trần Văn B",
-    "role": "USER",
-    "status": "ACTIVE"
+    "id": "uuid", "email": "...", "fullName": "...",
+    "role": "USER", "status": "ACTIVE", ...
+  }
+}
+```
+
+**Errors:**
+- `409` — Email đã được sử dụng
+
+---
+
+### PATCH `/users/me`
+
+Cập nhật thông tin cá nhân của bản thân. Tất cả fields đều optional.
+
+**Auth:** JWT cookie (USER hoặc ADMIN)
+
+**Request Body:**
+```json
+{
+  "fullName": "Nguyễn Văn A Updated",
+  "avatar": "https://...",
+  "phone": "0999888777",
+  "metadata": {
+    "bio": "Mô tả bản thân",
+    "status": "Đang học NestJS",
+    "facebook": "https://facebook.com/...",
+    "instagram": "https://instagram.com/...",
+    "github": "https://github.com/...",
+    "linkedin": "https://linkedin.com/...",
+    "website": "https://mywebsite.com"
+  }
+}
+```
+
+**Success (200):**
+```json
+{
+  "users": {
+    "id": "uuid", "email": "...", "fullName": "...",
+    "avatar": "...", "phone": "...", "metadata": { ... },
+    "updatedAt": "..."
   }
 }
 ```
 
 ---
 
-### 8. Phê duyệt user
+### PATCH `/users/:id/approve`
 
-**PATCH** `/users/:id/approve`
+Phê duyệt tài khoản đang chờ duyệt. Chuyển `status: PENDING` → `ACTIVE` và gửi email thông báo cho user.
 
-**Requires:** ADMIN role
+**Auth:** JWT cookie + ADMIN
 
-**Success Response (200):**
+**Success (200):**
 ```json
 {
   "message": "Tài khoản đã được phê duyệt",
-  "user": {
-    "id": "uuid-string",
-    "email": "user@example.com",
-    "status": "ACTIVE"
-  }
+  "user": { "id": "uuid", "status": "ACTIVE", ... }
 }
 ```
 
 ---
 
-### 9. Khóa tài khoản user
+### PATCH `/users/:id/block`
 
-**PATCH** `/users/:id/block`
+Khóa tài khoản user. Admin không thể tự khóa chính mình.
 
-**Requires:** ADMIN role
+**Auth:** JWT cookie + ADMIN
 
-**Note:** Admin không thể tự khóa tài khoản của chính mình
-
-**Success Response (200):**
+**Success (200):**
 ```json
 {
   "message": "Tài khoản đã bị khóa",
-  "user": {
-    "id": "uuid-string",
-    "status": "BLOCKED"
-  }
+  "user": { "id": "uuid", "status": "BLOCKED", ... }
 }
 ```
 
-**Error (403):**
-```json
-{
-  "statusCode": 403,
-  "message": "Bạn không thể tự khóa tài khoản của chính mình"
-}
-```
+**Errors:**
+- `403` — Admin tự khóa chính mình
+- `404` — User không tồn tại
 
 ---
 
-### 10. Mở khóa tài khoản user
+### PATCH `/users/:id/unblock`
 
-**PATCH** `/users/:id/unblock`
+Mở khóa tài khoản đã bị khóa.
 
-**Requires:** ADMIN role
+**Auth:** JWT cookie + ADMIN
 
-**Success Response (200):**
+**Success (200):**
 ```json
 {
   "message": "Tài khoản đã được mở khóa",
-  "user": {
-    "id": "uuid-string",
-    "status": "ACTIVE"
-  }
+  "user": { "id": "uuid", "status": "ACTIVE", ... }
 }
 ```
 
 ---
 
-### 11. Từ chối yêu cầu đăng ký
+### DELETE `/users/:id/reject`
 
-**DELETE** `/users/:id/reject`
+Từ chối và xóa hoàn toàn tài khoản đang chờ duyệt. Gửi email thông báo từ chối.
 
-**Requires:** ADMIN role
+**Auth:** JWT cookie + ADMIN
 
-**Note:** Xóa user có status PENDING khỏi hệ thống
-
-**Success Response (200):**
+**Success (200):**
 ```json
 {
   "message": "Yêu cầu đăng ký đã bị từ chối và xóa khỏi hệ thống"
 }
 ```
 
+**Errors:**
+- `404` — User không tồn tại
+- `409` — User không ở trạng thái `PENDING`
+
 ---
 
-### 12. Xóa user
+### DELETE `/users/:id`
 
-**DELETE** `/users/:id`
+Xóa vĩnh viễn một user. Admin không thể tự xóa chính mình.
 
-**Requires:** ADMIN role
+**Auth:** JWT cookie + ADMIN
 
-**Note:** Admin không thể tự xóa tài khoản của chính mình
-
-**Success Response (200):**
+**Success (200):**
 ```json
 {
   "message": "User đã được xóa"
 }
 ```
 
----
-
-### 13. Cập nhật thông tin cá nhân
-
-**PATCH** `/users/me`
-
-**Requires:** Authentication (USER hoặc ADMIN)
-
-**Request Body:**
-```json
-{
-  "fullName": "Nguyễn Văn A Updated",
-  "avatar": "https://example.com/new-avatar.jpg",
-  "phone": "0999888777",
-  "metadata": {
-    "dateOfBirth": "1990-01-01",
-    "address": "Hà Nội",
-    "customField": "value"
-  }
-}
-```
-
-**Note:** Tất cả các trường đều optional
-
-**Success Response (200):**
-```json
-{
-  "users": {
-    "id": "uuid-string",
-    "email": "user@example.com",
-    "fullName": "Nguyễn Văn A Updated",
-    "avatar": "https://example.com/new-avatar.jpg",
-    "phone": "0999888777",
-    "metadata": {
-      "dateOfBirth": "1990-01-01",
-      "address": "Hà Nội"
-    },
-    "updatedAt": "2024-01-02T00:00:00.000Z"
-  }
-}
-```
+**Errors:**
+- `403` — Admin tự xóa chính mình
+- `404` — User không tồn tại
 
 ---
 
-### 14. Xem thông tin cá nhân
+## 📅 Timeline Events
 
-**GET** `/users/me/profile`
+Tất cả endpoints đều yêu cầu **JWT cookie**.
 
-**Requires:** Authentication
+**Các loại event (`eventType`):**
 
-**Success Response (200):**
-```json
-{
-  "user": {
-    "id": "uuid-string",
-    "email": "user@example.com",
-    "fullName": "Nguyễn Văn A",
-    "avatar": "https://example.com/avatar.jpg",
-    "phone": "0912345678",
-    "role": "USER",
-    "status": "ACTIVE"
-  }
-}
-```
+| Value | Ý nghĩa |
+|---|---|
+| `JOIN_BCN` | Gia nhập BCN |
+| `COURSE_COMPLETE` | Hoàn thành khóa học |
+| `QUIZ_COMPLETE` | Hoàn thành bài quiz |
+| `PROJECT_COMPLETE` | Hoàn thành dự án |
+| `SEMESTER_COMPLETE` | Hoàn thành học kỳ |
 
 ---
 
-### 15. Xem profile công khai của user khác
+### POST `/timeline-events`
 
-**GET** `/users/:id/profile`
+Tạo timeline event mới cho bản thân.
 
-**Requires:** Authentication
-
-**Note:** 
-- Mọi user đã đăng nhập có thể xem profile công khai của user khác
-- Chỉ trả về thông tin công khai (không bao gồm: số điện thoại, metadata, thông tin đăng nhập)
-- Chỉ có thể xem profile của user có status ACTIVE
-- Bao gồm timeline events của user đó
-
-**Success Response (200):**
-```json
-{
-  "user": {
-    "id": "uuid-string",
-    "email": "user@example.com",
-    "fullName": "Nguyễn Văn A",
-    "avatar": "https://example.com/avatar.jpg",
-    "role": "USER",
-    "status": "ACTIVE",
-    "createdAt": "2024-01-01T00:00:00.000Z",
-    "timelineEvents": [
-      {
-        "id": 3,
-        "eventType": "PROJECT_COMPLETE",
-        "title": "Hoàn thành project HTML CSS JS",
-        "metadata": {
-          "projectName": "Portfolio"
-        },
-        "createdAt": "2024-06-30T00:00:00.000Z"
-      },
-      {
-        "id": 2,
-        "eventType": "COURSE_COMPLETE",
-        "title": "Hoàn thành khóa C",
-        "metadata": {
-          "score": 95
-        },
-        "createdAt": "2024-05-15T00:00:00.000Z"
-      },
-      {
-        "id": 1,
-        "eventType": "JOIN_BCN",
-        "title": "Gia nhập BCN",
-        "metadata": {},
-        "createdAt": "2023-12-29T00:00:00.000Z"
-      }
-    ]
-  }
-}
-```
-
-**Error (404):**
-```json
-{
-  "statusCode": 404,
-  "message": "User với ID uuid-string không tồn tại"
-}
-```
-
----
-
-## 📅 Timeline Events APIs
-
-### 1. Tạo timeline event mới
-
-**POST** `/timeline-events`
-
-**Requires:** Authentication
+**Auth:** JWT cookie
 
 **Request Body:**
 ```json
 {
   "eventType": "COURSE_COMPLETE",
-  "title": "Hoàn thành khóa học C",
+  "title": "Hoàn thành khóa NestJS",
   "metadata": {
-    "courseId": "C101",
+    "courseId": "NJS101",
     "score": 95,
-    "duration": "3 months"
+    "duration": "2 months"
   }
 }
 ```
 
-**Event Types:**
-- `JOIN_BCN`: Gia nhập BCN
-- `COURSE_COMPLETE`: Hoàn thành khóa học
-- `QUIZ_COMPLETE`: Hoàn thành bài quiz
-- `PROJECT_COMPLETE`: Hoàn thành dự án
-- `SEMESTER_COMPLETE`: Hoàn thành học kỳ
-
-**Success Response (201):**
+**Success (201):**
 ```json
 {
   "id": 1,
-  "userUuid": "uuid-string",
+  "userUuid": "uuid",
   "eventType": "COURSE_COMPLETE",
-  "title": "Hoàn thành khóa học C",
-  "metadata": {
-    "courseId": "C101",
-    "score": 95
-  },
-  "createdAt": "2024-01-01T00:00:00.000Z"
+  "title": "Hoàn thành khóa NestJS",
+  "metadata": { "courseId": "NJS101", "score": 95 },
+  "createdAt": "2026-01-01T00:00:00.000Z"
 }
 ```
 
 ---
 
-### 2. Lấy timeline của user hiện tại
+### GET `/timeline-events/my-timeline`
 
-**GET** `/timeline-events/my-timeline`
+Lấy danh sách timeline events của bản thân, sắp xếp mới nhất trước, có phân trang.
 
-**Requires:** Authentication
+**Auth:** JWT cookie  
+**Query:** `page` (default `1`), `limit` (default `20`)
 
-**Success Response (200):**
+**Success (200):**
 ```json
 [
   {
     "id": 4,
-    "userUuid": "uuid-string",
+    "userUuid": "uuid",
     "eventType": "PROJECT_COMPLETE",
-    "title": "Hoàn thành project HTML CSS JS",
-    "metadata": {
-      "projectName": "Portfolio Website"
-    },
-    "createdAt": "2024-06-30T00:00:00.000Z"
-  },
-  {
-    "id": 3,
-    "userUuid": "uuid-string",
-    "eventType": "QUIZ_COMPLETE",
-    "title": "Hoàn thành quiz C",
-    "metadata": {
-      "score": 90
-    },
-    "createdAt": "2024-06-20T00:00:00.000Z"
-  },
-  {
-    "id": 2,
-    "userUuid": "uuid-string",
-    "eventType": "COURSE_COMPLETE",
-    "title": "Hoàn thành khóa C",
-    "metadata": {},
-    "createdAt": "2024-05-15T00:00:00.000Z"
-  },
-  {
-    "id": 1,
-    "userUuid": "uuid-string",
-    "eventType": "JOIN_BCN",
-    "title": "Gia nhập BCN",
-    "metadata": {},
-    "createdAt": "2023-12-29T00:00:00.000Z"
+    "title": "Hoàn thành Portfolio",
+    "metadata": { "projectName": "Portfolio Website" },
+    "createdAt": "2026-06-01T00:00:00.000Z"
   }
 ]
 ```
 
-**Note:** Events được sắp xếp theo thứ tự mới nhất
-
 ---
 
-### 3. Lấy chi tiết một timeline event
+### GET `/timeline-events/:id`
 
-**GET** `/timeline-events/:id`
+Lấy chi tiết một timeline event theo ID.
 
-**Requires:** Authentication
+**Auth:** JWT cookie  
+**Params:** `id` — số nguyên
 
-**Success Response (200):**
+**Success (200):**
 ```json
 {
   "id": 1,
-  "userUuid": "uuid-string",
+  "userUuid": "uuid",
   "eventType": "JOIN_BCN",
   "title": "Gia nhập BCN",
   "metadata": {},
-  "createdAt": "2023-12-29T00:00:00.000Z"
+  "createdAt": "2025-12-29T00:00:00.000Z"
 }
 ```
 
-**Error (404):**
-```json
-{
-  "statusCode": 404,
-  "message": "Timeline event with ID 1 not found"
-}
-```
+**Errors:**
+- `404` — Event không tồn tại
 
 ---
 
-### 4. Cập nhật timeline event
+### PATCH `/timeline-events/:id`
 
-**PATCH** `/timeline-events/:id`
+Cập nhật timeline event. Chỉ được chỉnh sửa event của chính mình.
 
-**Requires:** Authentication
+**Auth:** JWT cookie (phải là chủ sở hữu event)  
+**Params:** `id` — số nguyên
 
-**Note:** User chỉ có thể cập nhật event của chính mình
-
-**Request Body:**
+**Request Body (tất cả optional):**
 ```json
 {
   "eventType": "COURSE_COMPLETE",
   "title": "Hoàn thành khóa học C++",
-  "metadata": {
-    "courseId": "C102",
-    "score": 98
-  }
+  "metadata": { "score": 98 }
 }
 ```
 
-**Note:** Tất cả các trường đều optional
+**Success (200):** Updated event object
 
-**Success Response (200):**
-```json
-{
-  "id": 2,
-  "userUuid": "uuid-string",
-  "eventType": "COURSE_COMPLETE",
-  "title": "Hoàn thành khóa học C++",
-  "metadata": {
-    "courseId": "C102",
-    "score": 98
-  },
-  "createdAt": "2024-05-15T00:00:00.000Z"
-}
-```
-
-**Error (403):**
-```json
-{
-  "statusCode": 403,
-  "message": "You can only update your own timeline events"
-}
-```
+**Errors:**
+- `403` — Cố chỉnh sửa event của người khác
+- `404` — Event không tồn tại
 
 ---
 
-### 5. Xóa timeline event
+### DELETE `/timeline-events/:id`
 
-**DELETE** `/timeline-events/:id`
+Xóa timeline event. Chỉ admin mới có quyền xóa.
 
-**Requires:** ADMIN role
+**Auth:** JWT cookie + ADMIN  
+**Params:** `id` — số nguyên
 
-**Note:** Chỉ admin mới có thể xóa timeline events (kể cả của user khác)
+**Success (200):** Deleted event object
 
-**Success Response (200):**
-```json
-{
-  "id": 1,
-  "userUuid": "uuid-string",
-  "eventType": "JOIN_BCN",
-  "title": "Gia nhập BCN",
-  "metadata": {},
-  "createdAt": "2023-12-29T00:00:00.000Z"
-}
-```
-
-**Error (403):**
-```json
-{
-  "statusCode": 403,
-  "message": "Forbidden resource",
-  "error": "Forbidden"
-}
-```
+**Errors:**
+- `403` — Không có quyền ADMIN
+- `404` — Event không tồn tại
 
 ---
 
-## ⚠️ Common Errors
+## 🍪 Cookies & Tokens
 
-### 401 Unauthorized
-```json
-{
-  "statusCode": 401,
-  "message": "Unauthorized"
-}
-```
-**Nguyên nhân:** 
-- Chưa đăng nhập (thiếu access_token)
-- Token đã hết hạn
-- Token không hợp lệ
+### Cookie settings
 
-**Giải pháp:** Gọi `/auth/refresh` để làm mới token hoặc đăng nhập lại
+| Cookie | Max-Age | HttpOnly | Secure | SameSite | Domain (prod) |
+|---|---|---|---|---|---|
+| `access_token` | 60 phút | ✅ | ✅ (prod) | `none` | `.uside.studio` |
+| `refresh_token` | 7 ngày | ✅ | ✅ (prod) | `none` | `.uside.studio` |
 
----
+> **Development:** `secure: false`, không có `domain`, `sameSite: none` — cho phép cross-origin giữa các port localhost.
 
-### 403 Forbidden
-```json
-{
-  "statusCode": 403,
-  "message": "Forbidden resource",
-  "error": "Forbidden"
-}
-```
-**Nguyên nhân:**
-- Không có quyền truy cập endpoint (cần ADMIN role)
-- Cố gắng thao tác trên resource của người khác
+### TTL của các intermediate tokens (2FA)
 
----
+| Token | TTL | Dùng cho |
+|---|---|---|
+| `setupToken` | 15 phút | Setup flow (bắt buộc hoặc tự nguyện) |
+| `verificationToken` | 5 phút | Verify 2FA khi login |
+| `recoveryToken` | 30 phút | Reset 2FA qua recovery flow |
 
-### 404 Not Found
-```json
-{
-  "statusCode": 404,
-  "message": "Resource not found"
-}
-```
-**Nguyên nhân:** Resource không tồn tại (user, timeline event, etc.)
+### FE setup cơ bản
 
----
+```js
+// axios — áp dụng một lần toàn app
+axios.defaults.withCredentials = true;
 
-### 400 Bad Request
-```json
-{
-  "statusCode": 400,
-  "message": [
-    "Email không hợp lệ",
-    "Mật khẩu phải có ít nhất 6 ký tự"
-  ],
-  "error": "Bad Request"
-}
-```
-**Nguyên nhân:** Validation error - dữ liệu gửi lên không hợp lệ
-
----
-
-### 429 Too Many Requests
-```json
-{
-  "statusCode": 429,
-  "message": "ThrottlerException: Too Many Requests"
-}
-```
-**Nguyên nhân:** Vượt quá rate limit
-- Default: 60 requests / phút
-- Login/Register: 5 requests / phút
-- Forgot password: 3 requests / phút
-
----
-
-## 🔑 Authentication Flow
-
-### Luồng đăng nhập thông thường
-
-1. **Đăng ký:** `POST /auth/register`
-   - User đăng ký → status = PENDING
-   - Chờ admin approve
-
-2. **Admin phê duyệt:** `PATCH /users/:id/approve`
-   - Admin approve → status = ACTIVE
-   - User có thể đăng nhập
-
-3. **Đăng nhập:** `POST /auth/login`
-   - Nhận access_token (15 phút) và refresh_token (7 ngày) trong cookies
-   - Sử dụng access_token cho các API calls
-
-4. **Làm mới token:** `POST /auth/refresh`
-   - Khi access_token hết hạn, tự động gọi refresh để lấy token mới
-   - Không cần user đăng nhập lại
-
-5. **Đăng xuất:** `POST /auth/logout`
-   - Xóa cookies và blacklist token
-
-### Gọi API với Authentication
-
-**Cách 1: Sử dụng Cookie (Recommended)**
-```javascript
-// Browser tự động gửi cookies
-fetch('https://api.example.com/auth/profile', {
-  method: 'GET',
-  credentials: 'include', // Quan trọng: gửi cookies
-})
-
-// Xem profile user khác (bao gồm timeline)
-fetch('https://api.example.com/users/uuid-123/profile', {
-  method: 'GET',
+// fetch — thêm vào từng request
+fetch('/auth/login', {
+  method: 'POST',
   credentials: 'include',
-})
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ email, password }),
+});
 ```
 
-**Cách 2: Sử dụng Bearer Token**
-```javascript
-// Nếu không dùng cookie
-fetch('https://api.example.com/auth/profile', {
-  method: 'GET',
-  headers: {
-    'Authorization': `Bearer ${accessToken}`
-  }
-})
-```
+### Tự động refresh token
 
----
-
-## 📝 User Roles & Permissions
-
-### USER Role
-✅ Có thể:
-- Quản lý thông tin cá nhân
-- Xem và cập nhật timeline events của chính mình
-- Tìm kiếm users khác
-- Xem profile công khai của user khác
-
-❌ Không thể:
-- Xem danh sách tất cả users
-- Approve/Block/Delete users
-- Xóa timeline events
-- Xem thông tin chi tiết/riêng tư của user khác (phone, metadata)
-
-### ADMIN Role
-✅ Có thể:
-- Tất cả quyền của USER
-- Quản lý tất cả users (CRUD)
-- Approve/Block/Unblock users
-- Xóa timeline events của bất kỳ user nào
-- Xem thống kê
-
-❌ Không thể:
-- Tự xóa hoặc block chính mình
-
----
-
-## 🚀 Tips for Frontend Development
-
-### 1. Xử lý Token Expired
-```javascript
-// Interceptor để tự động refresh token
+```js
 axios.interceptors.response.use(
-  (response) => response,
+  (res) => res,
   async (error) => {
-    if (error.response?.status === 401) {
+    if (error.response?.status === 401 && !error.config._retry) {
+      error.config._retry = true;
       try {
-        await axios.post('/auth/refresh', {}, { 
-          withCredentials: true 
-        });
-        // Retry request gốc
+        await axios.post('/auth/refresh');
         return axios(error.config);
-      } catch (refreshError) {
-        // Redirect to login
+      } catch {
         window.location.href = '/login';
       }
     }
@@ -1181,81 +1529,73 @@ axios.interceptors.response.use(
 );
 ```
 
-### 2. Timeline Events Display
-```javascript
-// Format event type cho UI
-const EVENT_TYPE_LABELS = {
-  JOIN_BCN: { label: 'Gia nhập BCN', icon: '🎉', color: 'blue' },
-  COURSE_COMPLETE: { label: 'Hoàn thành khóa học', icon: '📚', color: 'green' },
-  QUIZ_COMPLETE: { label: 'Hoàn thành quiz', icon: '✅', color: 'purple' },
-  PROJECT_COMPLETE: { label: 'Hoàn thành dự án', icon: '🚀', color: 'orange' },
-  SEMESTER_COMPLETE: { label: 'Hoàn thành học kỳ', icon: '🎓', color: 'red' },
-};
-```
+---
 
-### 3. User Status Display
-```javascript
-const STATUS_CONFIG = {
-  PENDING: { label: 'Chờ duyệt', color: 'yellow', canLogin: false },
-  ACTIVE: { label: 'Hoạt động', color: 'green', canLogin: true },
-  BLOCKED: { label: 'Đã khóa', color: 'red', canLogin: false },
-};
-```
+## ⚠️ Lỗi thường gặp
 
-### 4. Rate Limiting Handling
-```javascript
-// Hiển thị countdown khi bị rate limit
-if (error.response?.status === 429) {
-  const retryAfter = error.response.headers['retry-after'] || 60;
-  showToast(`Vui lòng thử lại sau ${retryAfter} giây`);
+### 400 Bad Request
+Validation thất bại hoặc dữ liệu không hợp lệ.
+```json
+{
+  "statusCode": 400,
+  "message": ["email must be an email", "password must be longer than or equal to 6 characters"],
+  "error": "Bad Request"
 }
 ```
 
-### 5. User Profile Display
-```javascript
-// Component hiển thị profile với timeline
-function UserProfile({ userId }) {
-  const [profile, setProfile] = useState(null);
-  
-  useEffect(() => {
-    // Lấy profile công khai kèm timeline
-    fetch(`/users/${userId}/profile`, {
-      credentials: 'include'
-    })
-      .then(res => res.json())
-      .then(data => setProfile(data.user));
-  }, [userId]);
-  
-  return (
-    <div>
-      <div className="profile-header">
-        <img src={profile?.avatar} alt={profile?.fullName} />
-        <h1>{profile?.fullName}</h1>
-        <p>{profile?.email}</p>
-        <span className={`badge ${profile?.role}`}>{profile?.role}</span>
-      </div>
-      
-      <div className="timeline">
-        <h2>Timeline</h2>
-        {profile?.timelineEvents?.map(event => (
-          <div key={event.id} className="timeline-event">
-            <span className="icon">{EVENT_TYPE_LABELS[event.eventType].icon}</span>
-            <div>
-              <h3>{event.title}</h3>
-              <small>{new Date(event.createdAt).toLocaleDateString('vi-VN')}</small>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
+### 401 Unauthorized
+Chưa đăng nhập, token hết hạn, hoặc credentials sai.
+```json
+{ "statusCode": 401, "message": "Unauthorized" }
+```
+→ Gọi `POST /auth/refresh` để lấy token mới, hoặc đăng nhập lại.
+
+### 403 Forbidden
+Không đủ quyền (cần ADMIN role, hoặc cố thao tác tài nguyên của người khác).
+```json
+{ "statusCode": 403, "message": "Forbidden resource" }
+```
+
+### 404 Not Found
+Tài nguyên không tồn tại.
+```json
+{ "statusCode": 404, "message": "User với ID abc không tồn tại" }
+```
+
+### 409 Conflict
+Dữ liệu trùng lặp (email, phone đã dùng).
+```json
+{ "statusCode": 409, "message": "Email đã được sử dụng" }
+```
+
+### 429 Too Many Requests
+Vượt rate limit.
+```json
+{ "statusCode": 429, "message": "ThrottlerException: Too Many Requests" }
 ```
 
 ---
 
-## 📞 Support
+## 🚦 Rate Limits
 
-Nếu có vấn đề hoặc câu hỏi về API, vui lòng liên hệ:
-- Email: support@bcn.com
-- Slack: #api-support
+| Endpoint | Limit |
+|---|---|
+| Default | 60 req / phút |
+| `POST /auth/register` | 50 req / phút |
+| `POST /auth/login` | 50 req / phút |
+| `POST /auth/refresh` | 100 req / phút |
+| `POST /auth/forgot-password` | 30 req / phút |
+| `POST /auth/reset-password` | 50 req / phút |
+| `POST /auth/change-email/request` | 30 req / 15 phút |
+| `POST /auth/change-email/confirm` | 50 req / 15 phút |
+| `POST /auth/2fa/setup/initiate` | 30 req / phút |
+| `POST /auth/2fa/setup/confirm` | 30 req / phút |
+| `POST /auth/2fa/verify/*` | 50 req / phút |
+| `POST /auth/2fa/send-email-otp` | 30 req / 5 phút |
+| `POST /auth/2fa/recovery/request` | 20 req / 15 phút |
+| `POST /auth/2fa/recovery/verify-email` | 50 req / phút |
+| `POST /auth/2fa/recovery/reset` | 30 req / phút |
+| `POST /auth/2fa/me/enable/initiate` | 30 req / phút |
+| `POST /auth/2fa/me/enable/confirm` | 50 req / phút |
+| `POST /auth/2fa/me/disable` | 30 req / phút |
+| `GET /auth/me`, `GET /auth/2fa/me/status` | Không giới hạn |

@@ -48,6 +48,7 @@ model User {
   status                    UserStatus                   @default(ACTIVE)
   // 2FA fields
   twoFactorEnabled          Boolean                      @default(false)
+  twoFactorRequired         Boolean                      @default(false)
   totpSecret                String?
   twoFactorRecoveryCodes    TwoFactorRecoveryCode[]
   timelineEvents            TimelineEvent[]

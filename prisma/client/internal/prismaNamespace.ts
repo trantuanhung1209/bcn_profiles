@@ -862,6 +862,7 @@ export const UserScalarFieldEnum = {
   phone: 'phone',
   status: 'status',
   twoFactorEnabled: 'twoFactorEnabled',
+  twoFactorRequired: 'twoFactorRequired',
   totpSecret: 'totpSecret'
 } as const
 

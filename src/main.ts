@@ -27,10 +27,24 @@ async function bootstrap() {
   );
   app.useGlobalInterceptors(app.get(RequestLoggingInterceptor), new ResponseInterceptor());
 
+  const isProduction = process.env.NODE_ENV === 'production';
+
   app.enableCors({
-    origin: [/^https?:\/\/[^.]+\.uside\.studio$/, 'http://localhost:3000', 'http://localhost:5173', 'http://localhost:5500', 'https://profiles-uside-studio.vercel.app', 
-      'https://quizzes-uside-studio.vercel.app', 
-    ],
+    origin: isProduction
+      ? [
+          /^https:\/\/[^.]+\.uside\.studio$/,
+          /^https:\/\/.+\.vercel\.app$/,
+          'https://profiles-uside-studio.vercel.app',
+          'https://quizzes-uside-studio.vercel.app',
+        ]
+      : (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+          // Cho phép tất cả localhost và 127.0.0.1 ở mọi port khi development
+          if (!origin || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+            callback(null, true);
+          } else {
+            callback(new Error(`CORS blocked: ${origin}`));
+          }
+        },
     credentials: true,
   });
   

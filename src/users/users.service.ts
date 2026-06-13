@@ -11,7 +11,7 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { EmailService } from '../auth/services/email.service';
 
-export type UserWithoutPassword = Omit<User, 'password' | 'twoFactorEnabled' | 'totpSecret' | 'twoFactorRecoveryCodes'>;
+export type UserWithoutPassword = Omit<User, 'password' | 'twoFactorEnabled' | 'twoFactorRequired' | 'totpSecret' | 'twoFactorRecoveryCodes'>;
 
 export type SortableUserFields =
   | 'id'

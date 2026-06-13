@@ -9,10 +9,10 @@ import {
   HttpStatus,
   UnauthorizedException,
   Param,
-  Inject,
   BadRequestException,
   Headers,
   Logger,
+  NotFoundException,
 } from '@nestjs/common';
 import type { CookieOptions, Response } from 'express';
 import { AuthService } from './auth.service';
@@ -29,17 +29,14 @@ import { RequestEmailChangeDto } from './dto/request-email-change.dto';
 import { ConfirmEmailChangeDto } from './dto/confirm-email-change.dto';
 import { TwoFactorAuthService } from './services/two-factor-auth.service';
 import { TwoFactorSetupGuard } from './guards/two-factor-setup.guard';
-import { TwoFactorVerificationGuard } from './guards/two-factor-verification.guard';
 import { TwoFactorRecoveryGuard } from './guards/two-factor-recovery.guard';
 import { Roles } from './decorators/roles.decorator';
 import { RolesGuard } from './guards/roles.guard';
 import { SetupTwoFactorDto } from './dto/setup-two-factor.dto';
-import { VerifyTwoFactorTotpDto } from './dto/verify-two-factor-totp.dto';
-import { VerifyTwoFactorEmailDto } from './dto/verify-two-factor-email.dto';
-import { ConfirmTwoFactorSetupDto } from './dto/confirm-two-factor-setup.dto';
-import { TwoFactorRecoveryRequestDto, VerifyRecoveryEmailDto, ResetTwoFactorAfterRecoveryDto } from './dto/two-factor-recovery.dto';
+import { TwoFactorRecoveryRequestDto, VerifyRecoveryEmailDto } from './dto/two-factor-recovery.dto';
 import { AdminResetTwoFactorDto } from './dto/admin-reset-two-factor.dto';
 import { PrismaService } from '../prisma/prisma.service';
+import { InitiateEnable2FADto, ConfirmEnable2FADto, Disable2FADto } from './dto/enable-two-factor.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -58,11 +55,13 @@ export class AuthController {
       };
     }
 
-    // Localhost testing over HTTP cannot use SameSite=None + Secure.
+    // Development: sameSite='none' + secure=false cho phép cross-origin giữa
+    // các port localhost (e.g. FE :5173 <-> BE :3000).
+    // Lưu ý: Chrome/Firefox chấp nhận sameSite=none mà không có secure ở localhost.
     return {
       httpOnly: true,
       secure: false,
-      sameSite: 'lax',
+      sameSite: 'none',
       path: '/',
     };
   }
@@ -90,14 +89,14 @@ export class AuthController {
   ) {}
 
   @Public()
-  @Throttle({ default: { ttl: 60000, limit: 5 } })
+  @Throttle({ default: { ttl: 60000, limit: 50 } })
   @Post('register')
   async register(@Body() registerDto: RegisterDto) {
     return this.authService.register(registerDto);
   }
 
   @Public()
-  @Throttle({ default: { ttl: 60000, limit: 5 } })
+  @Throttle({ default: { ttl: 60000, limit: 50 } })
   @UseGuards(AuthGuard('local'))
   @Post('login')
   @HttpCode(HttpStatus.OK)
@@ -122,6 +121,20 @@ export class AuthController {
         requiresTwoFactorVerification: true,
         verificationToken: result.verificationToken,
         message: result.message,
+      };
+    }
+
+    // If 2FA can be skipped - generate tokens and login directly
+    if (result.skipTwoFactor) {
+      const tokens = await this.authService.generateTokensAfterTwoFactorVerification(user.id);
+
+      response.cookie('access_token', tokens.access_token, this.accessTokenCookieOptions);
+      response.cookie('refresh_token', tokens.refresh_token, this.refreshTokenCookieOptions);
+
+      return {
+        message: 'Đăng nhập thành công (2FA không bắt buộc)',
+        user: tokens.user,
+        skipTwoFactor: true,
       };
     }
 
@@ -161,7 +174,7 @@ export class AuthController {
   }
 
   @Public()
-  @Throttle({ default: { ttl: 60000, limit: 10 } })
+  @Throttle({ default: { ttl: 60000, limit: 100 } })
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   async refresh(@Res({ passthrough: true }) response: Response) {
@@ -187,7 +200,7 @@ export class AuthController {
   }
 
   @Public()
-  @Throttle({ default: { ttl: 60000, limit: 3 } })
+  @Throttle({ default: { ttl: 60000, limit: 30 } })
   @Post('forgot-password')
   @HttpCode(HttpStatus.OK)
   async forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
@@ -195,14 +208,14 @@ export class AuthController {
   }
 
   @Public()
-  @Throttle({ default: { ttl: 60000, limit: 5 } })
+  @Throttle({ default: { ttl: 60000, limit: 50 } })
   @Post('reset-password')
   @HttpCode(HttpStatus.OK)
   async resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
     return this.authService.resetPassword(resetPasswordDto);
   }
 
-  @Throttle({ default: { ttl: 900000, limit: 3 } })
+  @Throttle({ default: { ttl: 900000, limit: 30 } })
   @Post('change-email/request')
   @HttpCode(HttpStatus.OK)
   async requestEmailChange(
@@ -212,7 +225,7 @@ export class AuthController {
     return this.authService.requestEmailChange(user.id, dto);
   }
 
-  @Throttle({ default: { ttl: 900000, limit: 5 } })
+  @Throttle({ default: { ttl: 900000, limit: 50 } })
   @Post('change-email/confirm')
   @HttpCode(HttpStatus.OK)
   async confirmEmailChange(
@@ -258,7 +271,7 @@ export class AuthController {
    * Requires setupToken (from login response)
    */
   @Public()
-  @Throttle({ default: { ttl: 60000, limit: 3 } })
+  @Throttle({ default: { ttl: 60000, limit: 30 } })
   @UseGuards(TwoFactorSetupGuard)
   @Post('2fa/setup/initiate')
   @HttpCode(HttpStatus.OK)
@@ -290,71 +303,32 @@ export class AuthController {
   /**
    * SETUP FLOW: Verify TOTP code and get backup codes
    * POST /auth/2fa/setup/verify
-   * Requires setupToken, TOTP secret, and valid TOTP code
-   * Body: { secret: string, code: string }
+   * --- REMOVED: logic merged into setup/confirm ---
    */
-  @Public()
-  @Throttle({ default: { ttl: 60000, limit: 5 } })
-  @UseGuards(TwoFactorSetupGuard)
-  @Post('2fa/setup/verify')
-  @HttpCode(HttpStatus.OK)
-  async verifyTwoFactorSetup(
-    @User() user: any,
-    @Body() body: { secret: string; code: string },
-  ) {
-    if (!body.secret || !body.code) {
-      throw new BadRequestException('Secret and code are required');
-    }
-
-    // Verify the TOTP code
-    const isCodeValid = await this.twoFactorAuthService.verifyTOTPCode(body.secret, body.code);
-    if (!isCodeValid) {
-      throw new UnauthorizedException('Mã TOTP không chính xác. Vui lòng thử lại.');
-    }
-
-    // Generate backup codes
-    const backupCodes = await this.twoFactorAuthService.generateBackupCodes(10);
-
-    // Return backup codes - user must confirm they saved them before completing setup
-    return {
-      success: true,
-      backupCodes,
-      message: 'Mã TOTP chính xác! Đây là mã backup của bạn. Lưu chúng ở nơi an toàn.',
-      warningMessage: 'QUAN TRỌNG: Lưu những mã này ở nơi an toàn. Nếu mất access 2FA, bạn sẽ cần những mã này để khôi phục.',
-      nextStep: 'Gọi endpoint confirm-2fa-setup để hoàn tất setup',
-    };
-  }
 
   /**
-   * SETUP FLOW: Confirm 2FA setup with backup codes
+   * SETUP FLOW: Confirm 2FA setup — verify TOTP, generate + save backup codes, issue tokens
    * POST /auth/2fa/setup/confirm
-   * Requires setupToken, secret, and backup codes
-   * Body: { secret: string, backupCodes: string[] }
+   * Requires setupToken (header), body: { secret: string, code: string }
    */
   @Public()
-  @Throttle({ default: { ttl: 60000, limit: 3 } })
+  @Throttle({ default: { ttl: 60000, limit: 30 } })
   @UseGuards(TwoFactorSetupGuard)
   @Post('2fa/setup/confirm')
   @HttpCode(HttpStatus.OK)
   async confirmTwoFactorSetup(
     @User() user: any,
-    @Body() body: { secret: string; backupCodes: string[] },
+    @Body() body: { secret: string; code: string },
     @Res({ passthrough: true }) response: Response,
   ) {
-    if (!body.secret || !body.backupCodes || body.backupCodes.length === 0) {
-      throw new BadRequestException('Secret and backup codes are required');
+    if (!body.secret || !body.code) {
+      throw new BadRequestException('Secret and TOTP code are required');
     }
 
-    // Get the expected secret from setupToken via user context
-    // The TwoFactorSetupGuard already validates the token, so we have the user info
-    // But we need to validate that the secret provided matches what was set up
-    // For now, we'll trust the setupToken already validated the user
-    // Additional validation: secret format should be base32
-    if (!/^[A-Z2-7]+={0,6}$/.test(body.secret)) {
+    if (!/^[A-Z2-7]+=*$/.test(body.secret)) {
       throw new BadRequestException('Invalid secret format');
     }
 
-    // Validate that the secret matches the one from setupToken
     if (!user.totpSecret) {
       throw new UnauthorizedException('Setup token does not contain secret. Please restart setup.');
     }
@@ -363,23 +337,32 @@ export class AuthController {
       throw new UnauthorizedException('Secret does not match. Please use the secret from setup/initiate.');
     }
 
+    // Verify TOTP code before saving anything
+    const isCodeValid = await this.twoFactorAuthService.verifyTOTPCode(body.secret, body.code);
+    if (!isCodeValid) {
+      throw new UnauthorizedException('Mã TOTP không chính xác. Vui lòng thử lại.');
+    }
+
+    // Generate backup codes server-side (not client-provided)
+    const backupCodes = await this.twoFactorAuthService.generateBackupCodes(10);
+
     // Save TOTP secret and backup codes to database
-    await this.twoFactorAuthService.enableTwoFactor(user.userId, body.secret, body.backupCodes);
-    
+    await this.twoFactorAuthService.enableTwoFactor(user.userId, body.secret, backupCodes);
+
     // Store recovery codes in separate table for one-time use tracking
-    await this.twoFactorAuthService.storeRecoveryCodes(user.userId, body.backupCodes);
+    await this.twoFactorAuthService.storeRecoveryCodes(user.userId, backupCodes);
 
     // Generate actual access tokens after successful 2FA setup
     const tokens = await this.authService.generateTokensAfterTwoFactorVerification(user.userId);
 
     // Set cookies
     response.cookie('access_token', tokens.access_token, this.accessTokenCookieOptions);
-
     response.cookie('refresh_token', tokens.refresh_token, this.refreshTokenCookieOptions);
 
     return {
       success: true,
       message: '2FA setup hoàn tất! Tài khoản của bạn hiện đã được bảo vệ bằng 2FA.',
+      backupCodes,
       user: tokens.user,
       securityTip: 'Giữ mã backup ở nơi an toàn. Nếu mất access 2FA, bạn sẽ cần những mã này.',
     };
@@ -393,7 +376,7 @@ export class AuthController {
    * Body: { code: string }
    */
   @Public()
-  @Throttle({ default: { ttl: 60000, limit: 5 } })
+  @Throttle({ default: { ttl: 60000, limit: 50 } })
   @Post('2fa/verify/totp')
   @HttpCode(HttpStatus.OK)
   async verifyTwoFactorTOTP(
@@ -451,7 +434,7 @@ export class AuthController {
    * Body: { code: string }
    */
   @Public()
-  @Throttle({ default: { ttl: 60000, limit: 5 } })
+  @Throttle({ default: { ttl: 60000, limit: 50 } })
   @Post('2fa/verify/email')
   @HttpCode(HttpStatus.OK)
   async verifyTwoFactorEmail(
@@ -502,7 +485,7 @@ export class AuthController {
    * Body: { code: string }
    */
   @Public()
-  @Throttle({ default: { ttl: 60000, limit: 5 } })
+  @Throttle({ default: { ttl: 60000, limit: 50 } })
   @Post('2fa/verify/backup-code')
   @HttpCode(HttpStatus.OK)
   async verifyBackupCode(
@@ -553,7 +536,7 @@ export class AuthController {
    * Header: Authorization: Bearer <verificationToken>
    */
   @Public()
-  @Throttle({ default: { ttl: 300000, limit: 3 } }) // 5 min, 3 requests
+  @Throttle({ default: { ttl: 300000, limit: 30 } }) // 5 min, 3 requests
   @Post('2fa/send-email-otp')
   @HttpCode(HttpStatus.OK)
   async sendTwoFactorEmailOTP(
@@ -583,20 +566,14 @@ export class AuthController {
    * Public endpoint - user provides email
    */
   @Public()
-  @Throttle({ default: { ttl: 900000, limit: 2 } }) // 15 min, 2 requests
+  @Throttle({ default: { ttl: 900000, limit: 20 } }) // 15 min, 2 requests
   @Post('2fa/recovery/request')
   @HttpCode(HttpStatus.OK)
   async requestTwoFactorRecovery(
     @Body() dto: TwoFactorRecoveryRequestDto,
   ) {
-    // Generate 6-digit recovery OTP
-    const recoveryOtp = Math.floor(100000 + Math.random() * 900000).toString();
-    
-    // Send recovery email
+    // Send recovery OTP to email (OTP is generated inside generateAndSendEmailOTP)
     await this.twoFactorAuthService.generateAndSendEmailOTP(dto.email);
-
-    // Store recovery request in a way that we can verify
-    // For now, the generateAndSendEmailOTP stores it
 
     return {
       success: true,
@@ -611,7 +588,7 @@ export class AuthController {
    * Public endpoint - user provides email and recovery OTP
    */
   @Public()
-  @Throttle({ default: { ttl: 60000, limit: 5 } })
+  @Throttle({ default: { ttl: 60000, limit: 50 } })
   @Post('2fa/recovery/verify-email')
   @HttpCode(HttpStatus.OK)
   async verifyRecoveryEmail(
@@ -650,7 +627,7 @@ export class AuthController {
    * Requires recoveryToken (from previous step)
    */
   @Public()
-  @Throttle({ default: { ttl: 60000, limit: 3 } })
+  @Throttle({ default: { ttl: 60000, limit: 30 } })
   @UseGuards(TwoFactorRecoveryGuard)
   @Post('2fa/recovery/reset')
   @HttpCode(HttpStatus.OK)
@@ -667,29 +644,108 @@ export class AuthController {
     };
   }
 
+  // ====== USER SELF-SERVICE 2FA ======
+
   /**
-   * ADMIN ENDPOINTS: Get 2FA status
-   * GET /auth/2fa/status/:userId
-   * Requires admin role
+   * STEP 1: User tự bật 2FA — lấy QR code và setupToken
+   * POST /auth/2fa/me/enable/initiate
+   * Yêu cầu: đã đăng nhập (JWT), body: { password }
    */
-  @UseGuards(RolesGuard)
-  @Roles('ADMIN' as any)
-  @Get('2fa/status/:userId')
-  async getTwoFactorStatus(
-    @Param('userId') userId: string,
+  @Throttle({ default: { ttl: 60000, limit: 30 } })
+  @Post('2fa/me/enable/initiate')
+  @HttpCode(HttpStatus.OK)
+  async initiateMyEnable2FA(
+    @User() user: any,
+    @Body() dto: InitiateEnable2FADto,
   ) {
-    const status = await this.twoFactorAuthService.getTwoFactorStatus(userId);
-    return status;
+    const result = await this.twoFactorAuthService.initiateUserEnable2FA(user.id, user.email, dto.password);
+
+    return {
+      success: true,
+      secret: result.secret,
+      qrCode: result.qrCode,
+      setupToken: result.setupToken,
+      message: 'Quét mã QR bằng ứng dụng Authenticator rồi gọi confirm để hoàn tất.',
+    };
   }
 
   /**
-   * ADMIN ENDPOINTS: Reset user's 2FA
+   * STEP 2: User xác nhận bật 2FA — verify TOTP, lưu DB, nhận backup codes
+   * POST /auth/2fa/me/enable/confirm
+   * Yêu cầu: setupToken trong Authorization header, body: { secret, code }
+   */
+  @Public()
+  @Throttle({ default: { ttl: 60000, limit: 50 } })
+  @UseGuards(TwoFactorSetupGuard)
+  @Post('2fa/me/enable/confirm')
+  @HttpCode(HttpStatus.OK)
+  async confirmMyEnable2FA(
+    @User() user: any,
+    @Body() dto: ConfirmEnable2FADto,
+  ) {
+    if (!user.totpSecret) {
+      throw new BadRequestException('Setup token không chứa secret. Vui lòng bắt đầu lại từ bước initiate.');
+    }
+
+    if (dto.secret !== user.totpSecret) {
+      throw new BadRequestException('Secret không khớp với setup token.');
+    }
+
+    const { backupCodes } = await this.twoFactorAuthService.confirmUserEnable2FA(user.userId, dto.secret, dto.code);
+
+    return {
+      success: true,
+      backupCodes,
+      message: '2FA đã được bật thành công! Lưu các mã backup ở nơi an toàn.',
+      warning: 'Nếu mất thiết bị Authenticator, bạn sẽ cần các mã backup này để đăng nhập.',
+    };
+  }
+
+  /**
+   * User tự tắt 2FA (chỉ khi không bị admin bắt buộc)
+   * POST /auth/2fa/me/disable
+   * Yêu cầu: đã đăng nhập (JWT), body: { password, totpCode }
+   */
+  @Throttle({ default: { ttl: 60000, limit: 30 } })
+  @Post('2fa/me/disable')
+  @HttpCode(HttpStatus.OK)
+  async disableMy2FA(
+    @User() user: any,
+    @Body() dto: Disable2FADto,
+  ) {
+    await this.twoFactorAuthService.userDisable2FA(user.id, dto.password, dto.totpCode);
+
+    return {
+      success: true,
+      message: '2FA đã được tắt. Tài khoản của bạn sẽ đăng nhập trực tiếp bằng email và mật khẩu.',
+    };
+  }
+
+  /**
+   * Lấy trạng thái 2FA của chính mình
+   * GET /auth/2fa/me/status
+   * Yêu cầu: đã đăng nhập (JWT)
+   */
+  @SkipThrottle()
+  @Get('2fa/me/status')
+  async getMy2FAStatus(@User() user: any) {
+    const status = await this.twoFactorAuthService.getTwoFactorStatus(user.id);
+
+    return {
+      twoFactorEnabled: status.enabled,
+      twoFactorRequired: status.required,
+      backupCodesRemaining: status.backupCodesRemaining,
+    };
+  }
+
+  /**
+   * ADMIN ENDPOINTS: Reset user's 2FA (includes audit log + email notification)
    * POST /auth/2fa/admin/reset/:userId
    * Requires admin role
    */
   @UseGuards(RolesGuard)
   @Roles('ADMIN' as any)
-  @Throttle({ default: { ttl: 60000, limit: 5 } })
+  @Throttle({ default: { ttl: 60000, limit: 50 } })
   @Post('2fa/admin/reset/:userId')
   @HttpCode(HttpStatus.OK)
   async adminResetTwoFactor(
@@ -718,25 +774,122 @@ export class AuthController {
   }
 
   /**
-   * ADMIN ENDPOINTS: Disable 2FA for user
-   * POST /auth/2fa/admin/disable/:userId
+   * ADMIN ENDPOINTS: Enforce 2FA requirement for user
+   * POST /auth/2fa/admin/require/:userId
    * Requires admin role
    */
   @UseGuards(RolesGuard)
   @Roles('ADMIN' as any)
-  @Throttle({ default: { ttl: 60000, limit: 5 } })
-  @Post('2fa/admin/disable/:userId')
+  @Throttle({ default: { ttl: 60000, limit: 50 } })
+  @Post('2fa/admin/require/:userId')
   @HttpCode(HttpStatus.OK)
-  async adminDisableTwoFactor(
+  async adminEnforceTwoFactorRequired(
     @Param('userId') userId: string,
     @User() adminUser: any,
   ) {
-    // Disable 2FA for user
-    await this.twoFactorAuthService.disableTwoFactor(userId, `Disabled by admin ${adminUser.email}`);
+    // Check user exists
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, fullName: true },
+    });
+
+    if (!user) {
+      throw new NotFoundException(`User ${userId} không tồn tại`);
+    }
+
+    // Enforce 2FA requirement
+    await this.twoFactorAuthService.setTwoFactorRequired(userId, true);
+
+    this.logger.log(`Admin ${adminUser.email} enforced 2FA requirement for user ${userId}`);
+
+    // Send notification email to user
+    void this.emailService.sendTwoFactorEnforcedNotification(user.email, user.fullName || undefined).catch((error) => {
+      this.logger.error('Failed to send 2FA enforcement notification', error instanceof Error ? error.stack : undefined);
+    });
 
     return {
       success: true,
-      message: `2FA của user ${userId} đã được vô hiệu hóa.`,
+      message: `User ${userId} bắt buộc phải sử dụng 2FA. User sẽ được thông báo via email.`,
+      userNotified: true,
+    };
+  }
+
+  /**
+   * ADMIN ENDPOINTS: Make 2FA optional for user
+   * POST /auth/2fa/admin/unrequire/:userId
+   * Requires admin role
+   */
+  @UseGuards(RolesGuard)
+  @Roles('ADMIN' as any)
+  @Throttle({ default: { ttl: 60000, limit: 50 } })
+  @Post('2fa/admin/unrequire/:userId')
+  @HttpCode(HttpStatus.OK)
+  async adminRemoveTwoFactorRequired(
+    @Param('userId') userId: string,
+    @User() adminUser: any,
+  ) {
+    // Check user exists
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, fullName: true },
+    });
+
+    if (!user) {
+      throw new NotFoundException(`User ${userId} không tồn tại`);
+    }
+
+    // Remove 2FA requirement (make it optional)
+    await this.twoFactorAuthService.setTwoFactorRequired(userId, false);
+
+    this.logger.log(`Admin ${adminUser.email} made 2FA optional for user ${userId}`);
+
+    // Send notification email to user
+    void this.emailService.sendTwoFactorOptionalNotification(user.email, user.fullName || undefined).catch((error) => {
+      this.logger.error('Failed to send 2FA optional notification', error instanceof Error ? error.stack : undefined);
+    });
+
+    return {
+      success: true,
+      message: `User ${userId} không bắt buộc phải sử dụng 2FA nữa. User sẽ được thông báo via email.`,
+      userNotified: true,
+    };
+  }
+
+  /**
+   * ADMIN ENDPOINTS: Get 2FA status for user
+   * GET /auth/2fa/admin/status/:userId
+   * Requires admin role
+   */
+  @UseGuards(RolesGuard)
+  @Roles('ADMIN' as any)
+  @Throttle({ default: { ttl: 60000, limit: 100 } })
+  @Get('2fa/admin/status/:userId')
+  @HttpCode(HttpStatus.OK)
+  async adminGetTwoFactorStatus(
+    @Param('userId') userId: string,
+  ) {
+    // Check user exists
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, twoFactorEnabled: true, twoFactorRequired: true },
+    });
+
+    if (!user) {
+      throw new NotFoundException(`User ${userId} không tồn tại`);
+    }
+
+    const status = await this.twoFactorAuthService.getTwoFactorStatus(userId);
+
+    return {
+      userId: user.id,
+      email: user.email,
+      twoFactorEnabled: status.enabled,
+      twoFactorRequired: status.required,
+      backupCodesRemaining: status.backupCodesRemaining,
+      status: {
+        setup: status.enabled ? '✅ Đã setup' : '❌ Chưa setup',
+        requirement: status.required ? '🔒 Bắt buộc' : '✔️ Tuỳ chọn',
+      },
     };
   }
 }

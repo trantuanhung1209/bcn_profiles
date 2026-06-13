@@ -431,12 +431,13 @@ export class TwoFactorAuthService {
    */
   async getTwoFactorStatus(userId: string): Promise<{
     enabled: boolean;
+    required: boolean;
     backupCodesRemaining: number;
   }> {
     const [user, unusedBackupCodes] = await Promise.all([
       this.prismaService.user.findUnique({
         where: { id: userId },
-        select: { twoFactorEnabled: true },
+        select: { twoFactorEnabled: true, twoFactorRequired: true },
       }),
       this.prismaService.twoFactorRecoveryCode.count({
         where: {
@@ -448,7 +449,95 @@ export class TwoFactorAuthService {
 
     return {
       enabled: user?.twoFactorEnabled || false,
+      required: user?.twoFactorRequired || false,
       backupCodesRemaining: unusedBackupCodes,
     };
+  }
+
+  /**
+   * Enforce 2FA requirement for a user (admin only)
+   */
+  async setTwoFactorRequired(userId: string, required: boolean): Promise<void> {
+    await this.prismaService.user.update({
+      where: { id: userId },
+      data: { twoFactorRequired: required },
+    });
+  }
+
+  /**
+   * Initiate voluntary 2FA enable flow: generate secret & QR, return setupToken with secret
+   * Does NOT save anything to DB yet — confirmed on /2fa/enable/confirm
+   */
+  async initiateUserEnable2FA(userId: string, email: string, password: string): Promise<{
+    secret: string;
+    qrCode: string;
+    setupToken: string;
+  }> {
+    const isPasswordValid = await this.validatePassword(userId, password);
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('Mật khẩu không chính xác');
+    }
+
+    const { secret, qrCode } = await this.generateTOTPSecret(email);
+    const setupToken = this.generateSetupTokenWithSecret(userId, email, secret);
+
+    return { secret, qrCode, setupToken };
+  }
+
+  /**
+   * Confirm voluntary 2FA enable: verify TOTP code, save to DB, return backup codes
+   */
+  async confirmUserEnable2FA(userId: string, totpSecret: string, totpCode: string): Promise<{
+    backupCodes: string[];
+  }> {
+    const isCodeValid = await this.verifyTOTPCode(totpSecret, totpCode);
+    if (!isCodeValid) {
+      throw new UnauthorizedException('Mã TOTP không chính xác. Vui lòng thử lại.');
+    }
+
+    const backupCodes = await this.generateBackupCodes(10);
+    await this.enableTwoFactor(userId, totpSecret, backupCodes);
+    await this.storeRecoveryCodes(userId, backupCodes);
+
+    return { backupCodes };
+  }
+
+  /**
+   * User voluntarily disables their own 2FA (not admin reset)
+   */
+  async userDisable2FA(userId: string, password: string, totpCode: string): Promise<void> {
+    const isPasswordValid = await this.validatePassword(userId, password);
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('Mật khẩu không chính xác');
+    }
+
+    const isRequired = await this.isTwoFactorRequired(userId);
+    if (isRequired) {
+      throw new BadRequestException('Tài khoản của bạn bắt buộc phải sử dụng 2FA. Liên hệ admin để gỡ yêu cầu này.');
+    }
+
+    const totpSecret = await this.getTOTPSecret(userId);
+    if (!totpSecret) {
+      throw new BadRequestException('2FA chưa được bật cho tài khoản này');
+    }
+
+    const isCodeValid = await this.verifyTOTPCode(totpSecret, totpCode);
+    if (!isCodeValid) {
+      throw new UnauthorizedException('Mã TOTP không chính xác');
+    }
+
+    await this.disableTwoFactor(userId, 'User disabled voluntarily');
+  }
+
+  /**
+   * Get 2FA requirement status for a user
+   */
+  async isTwoFactorRequired(userId: string): Promise<boolean> {
+    const user = await this.prismaService.user.findUnique({
+      where: { id: userId },
+      select: { twoFactorRequired: true },
+    });
+
+    return user?.twoFactorRequired || false;
   }
 }

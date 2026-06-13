@@ -38,6 +38,7 @@ export type UserMinAggregateOutputType = {
   phone: string | null
   status: $Enums.UserStatus | null
   twoFactorEnabled: boolean | null
+  twoFactorRequired: boolean | null
   totpSecret: string | null
 }
 
@@ -55,6 +56,7 @@ export type UserMaxAggregateOutputType = {
   phone: string | null
   status: $Enums.UserStatus | null
   twoFactorEnabled: boolean | null
+  twoFactorRequired: boolean | null
   totpSecret: string | null
 }
 
@@ -73,6 +75,7 @@ export type UserCountAggregateOutputType = {
   phone: number
   status: number
   twoFactorEnabled: number
+  twoFactorRequired: number
   totpSecret: number
   _all: number
 }
@@ -92,6 +95,7 @@ export type UserMinAggregateInputType = {
   phone?: true
   status?: true
   twoFactorEnabled?: true
+  twoFactorRequired?: true
   totpSecret?: true
 }
 
@@ -109,6 +113,7 @@ export type UserMaxAggregateInputType = {
   phone?: true
   status?: true
   twoFactorEnabled?: true
+  twoFactorRequired?: true
   totpSecret?: true
 }
 
@@ -127,6 +132,7 @@ export type UserCountAggregateInputType = {
   phone?: true
   status?: true
   twoFactorEnabled?: true
+  twoFactorRequired?: true
   totpSecret?: true
   _all?: true
 }
@@ -218,6 +224,7 @@ export type UserGroupByOutputType = {
   phone: string | null
   status: $Enums.UserStatus
   twoFactorEnabled: boolean
+  twoFactorRequired: boolean
   totpSecret: string | null
   _count: UserCountAggregateOutputType | null
   _min: UserMinAggregateOutputType | null
@@ -257,6 +264,7 @@ export type UserWhereInput = {
   phone?: Prisma.StringNullableFilter<"User"> | string | null
   status?: Prisma.EnumUserStatusFilter<"User"> | $Enums.UserStatus
   twoFactorEnabled?: Prisma.BoolFilter<"User"> | boolean
+  twoFactorRequired?: Prisma.BoolFilter<"User"> | boolean
   totpSecret?: Prisma.StringNullableFilter<"User"> | string | null
   twoFactorRecoveryCodes?: Prisma.TwoFactorRecoveryCodeListRelationFilter
   timelineEvents?: Prisma.TimelineEventListRelationFilter
@@ -277,6 +285,7 @@ export type UserOrderByWithRelationInput = {
   phone?: Prisma.SortOrderInput | Prisma.SortOrder
   status?: Prisma.SortOrder
   twoFactorEnabled?: Prisma.SortOrder
+  twoFactorRequired?: Prisma.SortOrder
   totpSecret?: Prisma.SortOrderInput | Prisma.SortOrder
   twoFactorRecoveryCodes?: Prisma.TwoFactorRecoveryCodeOrderByRelationAggregateInput
   timelineEvents?: Prisma.TimelineEventOrderByRelationAggregateInput
@@ -300,6 +309,7 @@ export type UserWhereUniqueInput = Prisma.AtLeast<{
   metadata?: Prisma.JsonNullableFilter<"User">
   status?: Prisma.EnumUserStatusFilter<"User"> | $Enums.UserStatus
   twoFactorEnabled?: Prisma.BoolFilter<"User"> | boolean
+  twoFactorRequired?: Prisma.BoolFilter<"User"> | boolean
   totpSecret?: Prisma.StringNullableFilter<"User"> | string | null
   twoFactorRecoveryCodes?: Prisma.TwoFactorRecoveryCodeListRelationFilter
   timelineEvents?: Prisma.TimelineEventListRelationFilter
@@ -320,6 +330,7 @@ export type UserOrderByWithAggregationInput = {
   phone?: Prisma.SortOrderInput | Prisma.SortOrder
   status?: Prisma.SortOrder
   twoFactorEnabled?: Prisma.SortOrder
+  twoFactorRequired?: Prisma.SortOrder
   totpSecret?: Prisma.SortOrderInput | Prisma.SortOrder
   _count?: Prisma.UserCountOrderByAggregateInput
   _max?: Prisma.UserMaxOrderByAggregateInput
@@ -344,6 +355,7 @@ export type UserScalarWhereWithAggregatesInput = {
   phone?: Prisma.StringNullableWithAggregatesFilter<"User"> | string | null
   status?: Prisma.EnumUserStatusWithAggregatesFilter<"User"> | $Enums.UserStatus
   twoFactorEnabled?: Prisma.BoolWithAggregatesFilter<"User"> | boolean
+  twoFactorRequired?: Prisma.BoolWithAggregatesFilter<"User"> | boolean
   totpSecret?: Prisma.StringNullableWithAggregatesFilter<"User"> | string | null
 }
 
@@ -362,6 +374,7 @@ export type UserCreateInput = {
   phone?: string | null
   status?: $Enums.UserStatus
   twoFactorEnabled?: boolean
+  twoFactorRequired?: boolean
   totpSecret?: string | null
   twoFactorRecoveryCodes?: Prisma.TwoFactorRecoveryCodeCreateNestedManyWithoutUserInput
   timelineEvents?: Prisma.TimelineEventCreateNestedManyWithoutUserInput
@@ -382,6 +395,7 @@ export type UserUncheckedCreateInput = {
   phone?: string | null
   status?: $Enums.UserStatus
   twoFactorEnabled?: boolean
+  twoFactorRequired?: boolean
   totpSecret?: string | null
   twoFactorRecoveryCodes?: Prisma.TwoFactorRecoveryCodeUncheckedCreateNestedManyWithoutUserInput
   timelineEvents?: Prisma.TimelineEventUncheckedCreateNestedManyWithoutUserInput
@@ -402,6 +416,7 @@ export type UserUpdateInput = {
   phone?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
   twoFactorEnabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  twoFactorRequired?: Prisma.BoolFieldUpdateOperationsInput | boolean
   totpSecret?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   twoFactorRecoveryCodes?: Prisma.TwoFactorRecoveryCodeUpdateManyWithoutUserNestedInput
   timelineEvents?: Prisma.TimelineEventUpdateManyWithoutUserNestedInput
@@ -422,6 +437,7 @@ export type UserUncheckedUpdateInput = {
   phone?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
   twoFactorEnabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  twoFactorRequired?: Prisma.BoolFieldUpdateOperationsInput | boolean
   totpSecret?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   twoFactorRecoveryCodes?: Prisma.TwoFactorRecoveryCodeUncheckedUpdateManyWithoutUserNestedInput
   timelineEvents?: Prisma.TimelineEventUncheckedUpdateManyWithoutUserNestedInput
@@ -442,6 +458,7 @@ export type UserCreateManyInput = {
   phone?: string | null
   status?: $Enums.UserStatus
   twoFactorEnabled?: boolean
+  twoFactorRequired?: boolean
   totpSecret?: string | null
 }
 
@@ -460,6 +477,7 @@ export type UserUpdateManyMutationInput = {
   phone?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
   twoFactorEnabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  twoFactorRequired?: Prisma.BoolFieldUpdateOperationsInput | boolean
   totpSecret?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
 }
 
@@ -478,6 +496,7 @@ export type UserUncheckedUpdateManyInput = {
   phone?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
   twoFactorEnabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  twoFactorRequired?: Prisma.BoolFieldUpdateOperationsInput | boolean
   totpSecret?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
 }
 
@@ -496,6 +515,7 @@ export type UserCountOrderByAggregateInput = {
   phone?: Prisma.SortOrder
   status?: Prisma.SortOrder
   twoFactorEnabled?: Prisma.SortOrder
+  twoFactorRequired?: Prisma.SortOrder
   totpSecret?: Prisma.SortOrder
 }
 
@@ -513,6 +533,7 @@ export type UserMaxOrderByAggregateInput = {
   phone?: Prisma.SortOrder
   status?: Prisma.SortOrder
   twoFactorEnabled?: Prisma.SortOrder
+  twoFactorRequired?: Prisma.SortOrder
   totpSecret?: Prisma.SortOrder
 }
 
@@ -530,6 +551,7 @@ export type UserMinOrderByAggregateInput = {
   phone?: Prisma.SortOrder
   status?: Prisma.SortOrder
   twoFactorEnabled?: Prisma.SortOrder
+  twoFactorRequired?: Prisma.SortOrder
   totpSecret?: Prisma.SortOrder
 }
 
@@ -593,6 +615,7 @@ export type UserCreateWithoutTwoFactorRecoveryCodesInput = {
   phone?: string | null
   status?: $Enums.UserStatus
   twoFactorEnabled?: boolean
+  twoFactorRequired?: boolean
   totpSecret?: string | null
   timelineEvents?: Prisma.TimelineEventCreateNestedManyWithoutUserInput
 }
@@ -612,6 +635,7 @@ export type UserUncheckedCreateWithoutTwoFactorRecoveryCodesInput = {
   phone?: string | null
   status?: $Enums.UserStatus
   twoFactorEnabled?: boolean
+  twoFactorRequired?: boolean
   totpSecret?: string | null
   timelineEvents?: Prisma.TimelineEventUncheckedCreateNestedManyWithoutUserInput
 }
@@ -647,6 +671,7 @@ export type UserUpdateWithoutTwoFactorRecoveryCodesInput = {
   phone?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
   twoFactorEnabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  twoFactorRequired?: Prisma.BoolFieldUpdateOperationsInput | boolean
   totpSecret?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   timelineEvents?: Prisma.TimelineEventUpdateManyWithoutUserNestedInput
 }
@@ -666,6 +691,7 @@ export type UserUncheckedUpdateWithoutTwoFactorRecoveryCodesInput = {
   phone?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
   twoFactorEnabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  twoFactorRequired?: Prisma.BoolFieldUpdateOperationsInput | boolean
   totpSecret?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   timelineEvents?: Prisma.TimelineEventUncheckedUpdateManyWithoutUserNestedInput
 }
@@ -685,6 +711,7 @@ export type UserCreateWithoutTimelineEventsInput = {
   phone?: string | null
   status?: $Enums.UserStatus
   twoFactorEnabled?: boolean
+  twoFactorRequired?: boolean
   totpSecret?: string | null
   twoFactorRecoveryCodes?: Prisma.TwoFactorRecoveryCodeCreateNestedManyWithoutUserInput
 }
@@ -704,6 +731,7 @@ export type UserUncheckedCreateWithoutTimelineEventsInput = {
   phone?: string | null
   status?: $Enums.UserStatus
   twoFactorEnabled?: boolean
+  twoFactorRequired?: boolean
   totpSecret?: string | null
   twoFactorRecoveryCodes?: Prisma.TwoFactorRecoveryCodeUncheckedCreateNestedManyWithoutUserInput
 }
@@ -739,6 +767,7 @@ export type UserUpdateWithoutTimelineEventsInput = {
   phone?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
   twoFactorEnabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  twoFactorRequired?: Prisma.BoolFieldUpdateOperationsInput | boolean
   totpSecret?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   twoFactorRecoveryCodes?: Prisma.TwoFactorRecoveryCodeUpdateManyWithoutUserNestedInput
 }
@@ -758,6 +787,7 @@ export type UserUncheckedUpdateWithoutTimelineEventsInput = {
   phone?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
   twoFactorEnabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  twoFactorRequired?: Prisma.BoolFieldUpdateOperationsInput | boolean
   totpSecret?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   twoFactorRecoveryCodes?: Prisma.TwoFactorRecoveryCodeUncheckedUpdateManyWithoutUserNestedInput
 }
@@ -817,6 +847,7 @@ export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   phone?: boolean
   status?: boolean
   twoFactorEnabled?: boolean
+  twoFactorRequired?: boolean
   totpSecret?: boolean
   twoFactorRecoveryCodes?: boolean | Prisma.User$twoFactorRecoveryCodesArgs<ExtArgs>
   timelineEvents?: boolean | Prisma.User$timelineEventsArgs<ExtArgs>
@@ -838,6 +869,7 @@ export type UserSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensio
   phone?: boolean
   status?: boolean
   twoFactorEnabled?: boolean
+  twoFactorRequired?: boolean
   totpSecret?: boolean
 }, ExtArgs["result"]["user"]>
 
@@ -856,6 +888,7 @@ export type UserSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensio
   phone?: boolean
   status?: boolean
   twoFactorEnabled?: boolean
+  twoFactorRequired?: boolean
   totpSecret?: boolean
 }, ExtArgs["result"]["user"]>
 
@@ -874,10 +907,11 @@ export type UserSelectScalar = {
   phone?: boolean
   status?: boolean
   twoFactorEnabled?: boolean
+  twoFactorRequired?: boolean
   totpSecret?: boolean
 }
 
-export type UserOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "email" | "password" | "fullName" | "avatar" | "createdAt" | "updatedAt" | "role" | "googleId" | "typeAuth" | "metadata" | "phone" | "status" | "twoFactorEnabled" | "totpSecret", ExtArgs["result"]["user"]>
+export type UserOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "email" | "password" | "fullName" | "avatar" | "createdAt" | "updatedAt" | "role" | "googleId" | "typeAuth" | "metadata" | "phone" | "status" | "twoFactorEnabled" | "twoFactorRequired" | "totpSecret", ExtArgs["result"]["user"]>
 export type UserInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   twoFactorRecoveryCodes?: boolean | Prisma.User$twoFactorRecoveryCodesArgs<ExtArgs>
   timelineEvents?: boolean | Prisma.User$timelineEventsArgs<ExtArgs>
@@ -907,6 +941,7 @@ export type $UserPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
     phone: string | null
     status: $Enums.UserStatus
     twoFactorEnabled: boolean
+    twoFactorRequired: boolean
     totpSecret: string | null
   }, ExtArgs["result"]["user"]>
   composites: {}
@@ -1347,6 +1382,7 @@ export interface UserFieldRefs {
   readonly phone: Prisma.FieldRef<"User", 'String'>
   readonly status: Prisma.FieldRef<"User", 'UserStatus'>
   readonly twoFactorEnabled: Prisma.FieldRef<"User", 'Boolean'>
+  readonly twoFactorRequired: Prisma.FieldRef<"User", 'Boolean'>
   readonly totpSecret: Prisma.FieldRef<"User", 'String'>
 }
     

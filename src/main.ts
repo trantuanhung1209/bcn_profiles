@@ -36,6 +36,7 @@ async function bootstrap() {
           /^https:\/\/.+\.vercel\.app$/,
           'https://profiles-uside-studio.vercel.app',
           'https://quizzes-uside-studio.vercel.app',
+          /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/,
         ]
       : (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
           // Cho phép tất cả localhost và 127.0.0.1 ở mọi port khi development

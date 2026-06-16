@@ -379,7 +379,7 @@ export class AuthService {
   async forgotPassword(forgotPasswordDto: ForgotPasswordDto) {
     const { email } = forgotPasswordDto;
 
-    // Kiểm tra xem email có tồn tại trong hệ thống không
+    // Tìm user theo email — không throw 404 để tránh lộ thông tin email tồn tại hay không
     const user = await this.prisma.user.findUnique({
       where: { email },
       select: {
@@ -389,8 +389,14 @@ export class AuthService {
       },
     });
 
+    // Luôn trả về response thành công dù email có tồn tại hay không
+    const genericResponse = {
+      message: 'Nếu email tồn tại trong hệ thống, mã OTP sẽ được gửi đến hộp thư của bạn.',
+      expiresIn: '15 phút',
+    };
+
     if (!user) {
-      throw new NotFoundException('Email không tồn tại trong hệ thống');
+      return genericResponse;
     }
 
     // Xóa các OTP cũ chưa sử dụng của email này
@@ -422,10 +428,7 @@ export class AuthService {
       this.logger.error('Failed to send reset-password OTP in background', error instanceof Error ? error.stack : undefined);
     });
 
-    return {
-      message: 'Mã OTP đang được gửi đến email của bạn. Vui lòng kiểm tra hộp thư.',
-      expiresIn: '15 phút',
-    };
+    return genericResponse;
   }
 
   /**

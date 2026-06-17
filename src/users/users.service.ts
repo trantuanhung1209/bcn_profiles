@@ -462,14 +462,20 @@ export class UsersService {
       throw new NotFoundException(`User với ID ${id} không tồn tại`);
     }
 
-    // Chỉ update các trường được phép: fullName, avatar, metadata
+    // Chỉ update các trường được phép: fullName, avatar, phone, metadata
+    // metadata được merge với data cũ thay vì replace toàn bộ
     const updatedUser = await this.prisma.user.update({
       where: { id },
       data: {
         fullName: updateUserDto.fullName,
         avatar: updateUserDto.avatar,
         phone: updateUserDto.phone,
-        ...(updateUserDto.metadata !== undefined && { metadata: updateUserDto.metadata as any }),
+        ...(updateUserDto.metadata !== undefined && {
+          metadata: {
+            ...(typeof user.metadata === 'object' && user.metadata !== null ? user.metadata : {}),
+            ...updateUserDto.metadata,
+          },
+        }),
         updatedAt: new Date(),
       },
       select: {

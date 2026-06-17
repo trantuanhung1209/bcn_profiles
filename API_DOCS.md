@@ -1228,14 +1228,19 @@ Cập nhật thông tin cá nhân của bản thân. Tất cả fields đều op
   "metadata": {
     "bio": "Mô tả bản thân",
     "status": "Đang học NestJS",
-    "facebook": "https://facebook.com/...",
-    "instagram": "https://instagram.com/...",
-    "github": "https://github.com/...",
-    "linkedin": "https://linkedin.com/...",
+    "facebook": "https://facebook.com/username",
+    "instagram": "https://instagram.com/username",
+    "tiktok": "https://tiktok.com/@username",
+    "youtube": "https://youtube.com/@username",
+    "github": "https://github.com/username",
+    "linkedin": "https://linkedin.com/in/username",
+    "twitter": "https://twitter.com/username",
     "website": "https://mywebsite.com"
   }
 }
 ```
+
+> **`metadata` được merge** — chỉ cần gửi field muốn thay đổi, các field còn lại giữ nguyên. Ví dụ chỉ gửi `{ "metadata": { "bio": "Hello" } }` thì chỉ `bio` được cập nhật, `github`, `facebook`... vẫn giữ nguyên giá trị cũ.
 
 **Success (200):**
 ```json

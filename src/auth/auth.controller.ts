@@ -346,8 +346,8 @@ export class AuthController {
     // Generate backup codes server-side (not client-provided)
     const backupCodes = await this.twoFactorAuthService.generateBackupCodes(10);
 
-    // Save TOTP secret and backup codes to database
-    await this.twoFactorAuthService.enableTwoFactor(user.userId, body.secret, backupCodes);
+    // Save TOTP secret to database and enable 2FA
+    await this.twoFactorAuthService.enableTwoFactor(user.userId, body.secret);
 
     // Store recovery codes in separate table for one-time use tracking
     await this.twoFactorAuthService.storeRecoveryCodes(user.userId, backupCodes);

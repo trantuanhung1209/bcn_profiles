@@ -84,14 +84,25 @@ export class TwoFactorAuthService {
   }
 
   /**
-   * Save TOTP secret and backup codes for user
+   * Save TOTP secret for user and enable 2FA.
+   * Backup codes are stored exclusively in the TwoFactorRecoveryCode table
+   * (via storeRecoveryCodes) — not duplicated in metadata.
+   * Merges into existing metadata instead of overwriting.
    */
   async enableTwoFactor(
     userId: string,
     totpSecret: string,
-    backupCodes: string[],
   ): Promise<void> {
-    const hashedBackupCodes = await this.hashBackupCodes(backupCodes);
+    // Fetch existing metadata to merge into
+    const existing = await this.prismaService.user.findUnique({
+      where: { id: userId },
+      select: { metadata: true },
+    });
+
+    const existingMetadata =
+      existing?.metadata && typeof existing.metadata === 'object' && !Array.isArray(existing.metadata)
+        ? (existing.metadata as Record<string, unknown>)
+        : {};
 
     await this.prismaService.user.update({
       where: { id: userId },
@@ -99,28 +110,39 @@ export class TwoFactorAuthService {
         twoFactorEnabled: true,
         totpSecret,
         metadata: {
-          backupCodes: hashedBackupCodes,
-          backupCodesCreatedAt: new Date().toISOString(),
+          ...existingMetadata,
+          twoFactorEnabledAt: new Date().toISOString(),
         },
       },
     });
   }
 
   /**
-   * Disable 2FA for user (admin or recovery)
+   * Disable 2FA for user (admin or recovery).
+   * Merges disable info into existing metadata instead of overwriting.
    */
   async disableTwoFactor(userId: string, reason?: string): Promise<void> {
-    const metadata = {
-      disabledAt: new Date().toISOString(),
-      disabledReason: reason || 'User requested reset',
-    };
+    // Fetch existing metadata to merge into
+    const existing = await this.prismaService.user.findUnique({
+      where: { id: userId },
+      select: { metadata: true },
+    });
+
+    const existingMetadata =
+      existing?.metadata && typeof existing.metadata === 'object' && !Array.isArray(existing.metadata)
+        ? (existing.metadata as Record<string, unknown>)
+        : {};
 
     await this.prismaService.user.update({
       where: { id: userId },
       data: {
         twoFactorEnabled: false,
         totpSecret: null,
-        metadata,
+        metadata: {
+          ...existingMetadata,
+          twoFactorDisabledAt: new Date().toISOString(),
+          twoFactorDisabledReason: reason || 'User requested reset',
+        },
       },
     });
   }
@@ -496,7 +518,7 @@ export class TwoFactorAuthService {
     }
 
     const backupCodes = await this.generateBackupCodes(10);
-    await this.enableTwoFactor(userId, totpSecret, backupCodes);
+    await this.enableTwoFactor(userId, totpSecret);
     await this.storeRecoveryCodes(userId, backupCodes);
 
     return { backupCodes };

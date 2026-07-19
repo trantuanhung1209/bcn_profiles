@@ -10,6 +10,7 @@ import * as bcrypt from 'bcrypt';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { EmailService } from '../auth/services/email.service';
+import { AuthSessionCacheService } from '../auth/services/auth-session-cache.service';
 
 export type UserWithoutPassword = Omit<User, 'password' | 'twoFactorEnabled' | 'twoFactorRequired' | 'totpSecret' | 'twoFactorRecoveryCodes'>;
 
@@ -40,6 +41,7 @@ export class UsersService {
   constructor(
     private prisma: PrismaService,
     private emailService: EmailService,
+    private readonly sessionCache: AuthSessionCacheService,
   ) {}
 
   async findPending(
@@ -334,6 +336,7 @@ export class UsersService {
     }
 
     await this.prisma.user.delete({ where: { id } });
+    this.sessionCache.invalidateUser(id);
 
     void this.emailService.sendRejectionEmail(user.email, user.fullName || undefined).catch((error) => {
       this.logger.error('Failed to send rejection email in background', error instanceof Error ? error.stack : undefined);
@@ -366,6 +369,8 @@ export class UsersService {
       },
     });
 
+    this.sessionCache.invalidateUser(id);
+
     void this.emailService.sendApprovalEmail(user.email, user.fullName || undefined).catch((error) => {
       // Không rollback nếu gửi email lỗi — tài khoản vẫn được duyệt
       this.logger.error('Failed to send approval email in background', error instanceof Error ? error.stack : undefined);
@@ -380,7 +385,7 @@ export class UsersService {
       throw new NotFoundException(`User với ID ${id} không tồn tại`);
     }
 
-    return this.prisma.user.update({
+    const updatedUser = await this.prisma.user.update({
       where: { id },
       data: { status: 'BLOCKED', updatedAt: new Date() },
       select: {
@@ -399,6 +404,9 @@ export class UsersService {
         password: false,
       },
     });
+
+    this.sessionCache.invalidateUser(id);
+    return updatedUser;
   }
 
   async unblockUser(id: string): Promise<UserWithoutPassword> {
@@ -407,7 +415,7 @@ export class UsersService {
       throw new NotFoundException(`User với ID ${id} không tồn tại`);
     }
 
-    return this.prisma.user.update({
+    const updatedUser = await this.prisma.user.update({
       where: { id },
       data: { status: 'ACTIVE', updatedAt: new Date() },
       select: {
@@ -426,6 +434,9 @@ export class UsersService {
         password: false,
       },
     });
+
+    this.sessionCache.invalidateUser(id);
+    return updatedUser;
   }
 
   // Method để tìm user với password (dùng cho authentication)
@@ -447,6 +458,7 @@ export class UsersService {
     await this.prisma.user.delete({
       where: { id },
     });
+    this.sessionCache.invalidateUser(id);
   }
 
   async updateUser(
@@ -495,6 +507,7 @@ export class UsersService {
       },
     });
 
+    this.sessionCache.invalidateUser(id);
     return updatedUser;
   }
 

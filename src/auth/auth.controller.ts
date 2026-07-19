@@ -32,7 +32,11 @@ import { TwoFactorRecoveryGuard } from './guards/two-factor-recovery.guard';
 import { Roles } from './decorators/roles.decorator';
 import { RolesGuard } from './guards/roles.guard';
 import { SetupTwoFactorDto } from './dto/setup-two-factor.dto';
-import { TwoFactorRecoveryRequestDto, VerifyRecoveryEmailDto } from './dto/two-factor-recovery.dto';
+import {
+  TwoFactorRecoveryRequestDto,
+  VerifyRecoveryEmailDto,
+  ResetTwoFactorAfterRecoveryDto,
+} from './dto/two-factor-recovery.dto';
 import { AdminResetTwoFactorDto } from './dto/admin-reset-two-factor.dto';
 import { PrismaService } from '../prisma/prisma.service';
 import { InitiateEnable2FADto, ConfirmEnable2FADto, Disable2FADto } from './dto/enable-two-factor.dto';
@@ -180,8 +184,10 @@ export class AuthController {
   @Post('logout')
   @HttpCode(HttpStatus.OK)
   async logout(@Res({ passthrough: true }) response: Response) {
-    // Stateless JWT: logout only clears cookies. Token remains cryptographically
-    // valid until exp; clients must drop cookies and stop sending the token.
+    const accessToken = response.req.cookies?.access_token as string | undefined;
+    const refreshToken = response.req.cookies?.refresh_token as string | undefined;
+    await this.authService.revokeTokenPair(accessToken, refreshToken);
+
     response.clearCookie('access_token', this.baseCookieOptions(response.req));
     response.clearCookie('refresh_token', this.baseCookieOptions(response.req));
 
@@ -252,34 +258,6 @@ export class AuthController {
     return this.authService.confirmEmailChange(user.id, dto);
   }
 
-  @Public()
-  @Get('google')
-  @UseGuards(AuthGuard('google'))
-  async googleAuth() {
-    // Guard sẽ redirect đến Google
-  }
-
-  @Public()
-  @Get('google/callback')
-  @UseGuards(AuthGuard('google'))
-  async googleAuthRedirect(
-    @User() user: any,
-    @Res({ passthrough: true }) response: Response,
-  ) {
-    const result = await this.authService.googleLogin(user);
-
-    // Set access token vào cookie
-    response.cookie('access_token', result.access_token, this.accessTokenCookieOptions(response.req));
-
-    // Set refresh token vào cookie
-    response.cookie('refresh_token', result.refresh_token, this.refreshTokenCookieOptions(response.req));
-
-    return {
-      message: 'Đăng nhập Google thành công',
-      user: result.user,
-    };
-  }
-
   // ====== 2FA ENDPOINTS ======
 
   /**
@@ -288,7 +266,7 @@ export class AuthController {
    * Requires setupToken (from login response)
    */
   @Public()
-  @Throttle({ default: { ttl: 60000, limit: 30 } })
+  @Throttle({ default: { ttl: 60000, limit: 10 } })
   @UseGuards(TwoFactorSetupGuard)
   @Post('2fa/setup/initiate')
   @HttpCode(HttpStatus.OK)
@@ -296,17 +274,23 @@ export class AuthController {
     @User() user: any,
     @Body() dto: SetupTwoFactorDto,
   ) {
-    // Validate password before allowing setup
-    const isPasswordValid = await this.twoFactorAuthService.validatePassword(user.userId, dto.password);
+    const isPasswordValid = await this.twoFactorAuthService.validatePassword(
+      user.userId,
+      dto.password,
+    );
     if (!isPasswordValid) {
       throw new UnauthorizedException('Mật khẩu không chính xác');
     }
 
-    // Generate TOTP secret and QR code
-    const { secret, qrCode } = await this.twoFactorAuthService.generateTOTPSecret(user.email);
+    // Consume the login-issued setup challenge, then bind a fresh one to the secret.
+    await this.twoFactorAuthService.consumeChallenge(user.jti);
 
-    // Generate new setupToken with secret embedded
-    const setupTokenWithSecret = this.twoFactorAuthService.generateSetupTokenWithSecret(user.userId, user.email, secret);
+    const { secret, qrCode } = await this.twoFactorAuthService.generateTOTPSecret(user.email);
+    const setupTokenWithSecret = await this.twoFactorAuthService.generateSetupTokenWithSecret(
+      user.userId,
+      user.email,
+      secret,
+    );
 
     return {
       success: true,
@@ -329,50 +313,46 @@ export class AuthController {
    * Requires setupToken (header), body: { secret: string, code: string }
    */
   @Public()
-  @Throttle({ default: { ttl: 60000, limit: 30 } })
+  @Throttle({ default: { ttl: 60000, limit: 10 } })
   @UseGuards(TwoFactorSetupGuard)
   @Post('2fa/setup/confirm')
   @HttpCode(HttpStatus.OK)
   async confirmTwoFactorSetup(
     @User() user: any,
-    @Body() body: { secret: string; code: string },
+    @Body() body: { secret?: string; code: string },
     @Res({ passthrough: true }) response: Response,
   ) {
-    if (!body.secret || !body.code) {
-      throw new BadRequestException('Secret and TOTP code are required');
+    if (!body.code) {
+      throw new BadRequestException('TOTP code is required');
     }
 
-    if (!/^[A-Z2-7]+=*$/.test(body.secret)) {
-      throw new BadRequestException('Invalid secret format');
-    }
-
-    if (!user.totpSecret) {
+    const totpSecret = user.totpSecret as string | undefined;
+    if (!totpSecret) {
       throw new UnauthorizedException('Setup token does not contain secret. Please restart setup.');
     }
 
-    if (body.secret !== user.totpSecret) {
-      throw new UnauthorizedException('Secret does not match. Please use the secret from setup/initiate.');
+    if (body.secret && body.secret !== totpSecret) {
+      throw new UnauthorizedException(
+        'Secret does not match. Please use the secret from setup/initiate.',
+      );
     }
 
-    // Verify TOTP code before saving anything
-    const isCodeValid = await this.twoFactorAuthService.verifyTOTPCode(body.secret, body.code);
+    const isCodeValid = await this.twoFactorAuthService.verifyTOTPCode(totpSecret, body.code);
     if (!isCodeValid) {
       throw new UnauthorizedException('Mã TOTP không chính xác. Vui lòng thử lại.');
     }
 
-    // Generate backup codes server-side (not client-provided)
+    const consumed = await this.twoFactorAuthService.consumeChallenge(user.jti);
+    if (!consumed) {
+      throw new UnauthorizedException('Setup token đã được sử dụng');
+    }
+
     const backupCodes = await this.twoFactorAuthService.generateBackupCodes(10);
-
-    // Save TOTP secret to database and enable 2FA
-    await this.twoFactorAuthService.enableTwoFactor(user.userId, body.secret);
-
-    // Store recovery codes in separate table for one-time use tracking
+    await this.twoFactorAuthService.enableTwoFactor(user.userId, totpSecret);
     await this.twoFactorAuthService.storeRecoveryCodes(user.userId, backupCodes);
 
-    // Generate actual access tokens after successful 2FA setup
     const tokens = await this.authService.generateTokensAfterTwoFactorVerification(user.userId);
 
-    // Set cookies
     response.cookie('access_token', tokens.access_token, this.accessTokenCookieOptions(response.req));
     response.cookie('refresh_token', tokens.refresh_token, this.refreshTokenCookieOptions(response.req));
 
@@ -393,7 +373,7 @@ export class AuthController {
    * Body: { code: string }
    */
   @Public()
-  @Throttle({ default: { ttl: 60000, limit: 50 } })
+  @Throttle({ default: { ttl: 60000, limit: 10 } })
   @Post('2fa/verify/totp')
   @HttpCode(HttpStatus.OK)
   async verifyTwoFactorTOTP(
@@ -414,26 +394,26 @@ export class AuthController {
       throw new UnauthorizedException('Invalid authorization header format');
     }
 
-    const user = this.twoFactorAuthService.validateVerificationToken(verificationToken);
-    
-    // Get user's TOTP secret from database
+    const user = await this.twoFactorAuthService.validateVerificationToken(verificationToken);
+
     const totpSecret = await this.twoFactorAuthService.getTOTPSecret(user.userId);
     if (!totpSecret) {
       throw new UnauthorizedException('2FA chưa được thiết lập');
     }
 
-    // Verify the TOTP code
     const isCodeValid = await this.twoFactorAuthService.verifyTOTPCode(totpSecret, code);
     if (!isCodeValid) {
       throw new UnauthorizedException('Mã TOTP không chính xác');
     }
 
-    // Generate real access tokens
+    const consumed = await this.twoFactorAuthService.consumeChallenge(user.jti);
+    if (!consumed) {
+      throw new UnauthorizedException('Verification token đã được sử dụng');
+    }
+
     const tokens = await this.authService.generateTokensAfterTwoFactorVerification(user.userId);
 
-    // Set cookies
     response.cookie('access_token', tokens.access_token, this.accessTokenCookieOptions(response.req));
-
     response.cookie('refresh_token', tokens.refresh_token, this.refreshTokenCookieOptions(response.req));
 
     return {
@@ -451,7 +431,7 @@ export class AuthController {
    * Body: { code: string }
    */
   @Public()
-  @Throttle({ default: { ttl: 60000, limit: 50 } })
+  @Throttle({ default: { ttl: 60000, limit: 10 } })
   @Post('2fa/verify/email')
   @HttpCode(HttpStatus.OK)
   async verifyTwoFactorEmail(
@@ -472,19 +452,21 @@ export class AuthController {
       throw new UnauthorizedException('Invalid authorization header format');
     }
 
-    const user = this.twoFactorAuthService.validateVerificationToken(verificationToken);
+    const user = await this.twoFactorAuthService.validateVerificationToken(verificationToken);
     const isEmailOTPValid = await this.twoFactorAuthService.verifyEmailOTP(user.email, code);
 
     if (!isEmailOTPValid) {
       throw new UnauthorizedException('Mã OTP email không chính xác hoặc đã hết hạn');
     }
 
-    // Generate real access tokens
+    const consumed = await this.twoFactorAuthService.consumeChallenge(user.jti);
+    if (!consumed) {
+      throw new UnauthorizedException('Verification token đã được sử dụng');
+    }
+
     const tokens = await this.authService.generateTokensAfterTwoFactorVerification(user.userId);
 
-    // Set cookies
     response.cookie('access_token', tokens.access_token, this.accessTokenCookieOptions(response.req));
-
     response.cookie('refresh_token', tokens.refresh_token, this.refreshTokenCookieOptions(response.req));
 
     return {
@@ -502,7 +484,7 @@ export class AuthController {
    * Body: { code: string }
    */
   @Public()
-  @Throttle({ default: { ttl: 60000, limit: 50 } })
+  @Throttle({ default: { ttl: 60000, limit: 10 } })
   @Post('2fa/verify/backup-code')
   @HttpCode(HttpStatus.OK)
   async verifyBackupCode(
@@ -523,19 +505,24 @@ export class AuthController {
       throw new UnauthorizedException('Invalid authorization header format');
     }
 
-    const user = this.twoFactorAuthService.validateVerificationToken(verificationToken);
-    const isBackupCodeValid = await this.twoFactorAuthService.markBackupCodeAsUsed(user.userId, code);
+    const user = await this.twoFactorAuthService.validateVerificationToken(verificationToken);
+    const isBackupCodeValid = await this.twoFactorAuthService.markBackupCodeAsUsed(
+      user.userId,
+      code,
+    );
 
     if (!isBackupCodeValid) {
       throw new UnauthorizedException('Mã backup không chính xác hoặc đã được sử dụng');
     }
 
-    // Generate real access tokens
+    const consumed = await this.twoFactorAuthService.consumeChallenge(user.jti);
+    if (!consumed) {
+      throw new UnauthorizedException('Verification token đã được sử dụng');
+    }
+
     const tokens = await this.authService.generateTokensAfterTwoFactorVerification(user.userId);
 
-    // Set cookies
     response.cookie('access_token', tokens.access_token, this.accessTokenCookieOptions(response.req));
-
     response.cookie('refresh_token', tokens.refresh_token, this.refreshTokenCookieOptions(response.req));
 
     return {
@@ -553,7 +540,7 @@ export class AuthController {
    * Header: Authorization: Bearer <verificationToken>
    */
   @Public()
-  @Throttle({ default: { ttl: 300000, limit: 30 } }) // 5 min, 3 requests
+  @Throttle({ default: { ttl: 300000, limit: 5 } })
   @Post('2fa/send-email-otp')
   @HttpCode(HttpStatus.OK)
   async sendTwoFactorEmailOTP(
@@ -568,7 +555,7 @@ export class AuthController {
       throw new UnauthorizedException('Invalid authorization header format');
     }
 
-    const user = this.twoFactorAuthService.validateVerificationToken(verificationToken);
+    const user = await this.twoFactorAuthService.validateVerificationToken(verificationToken);
     await this.twoFactorAuthService.generateAndSendEmailOTP(user.email);
 
     return {
@@ -583,20 +570,28 @@ export class AuthController {
    * Public endpoint - user provides email
    */
   @Public()
-  @Throttle({ default: { ttl: 900000, limit: 20 } }) // 15 min, 2 requests
+  @Throttle({ default: { ttl: 900000, limit: 3 } })
   @Post('2fa/recovery/request')
   @HttpCode(HttpStatus.OK)
   async requestTwoFactorRecovery(
     @Body() dto: TwoFactorRecoveryRequestDto,
   ) {
-    // Send recovery OTP to email (OTP is generated inside generateAndSendEmailOTP)
-    await this.twoFactorAuthService.generateAndSendEmailOTP(dto.email);
-
-    return {
+    const generic = {
       success: true,
-      message: 'Nếu email tồn tại, bạn sẽ nhận được mã khôi phục. Vui lòng kiểm tra hộp thư.',
+      message: 'Nếu email tồn tại và đã bật 2FA, bạn sẽ nhận được mã khôi phục.',
       nextStep: 'Sử dụng mã để xác nhận yêu cầu khôi phục',
     };
+
+    const user = await this.prisma.user.findUnique({
+      where: { email: dto.email },
+      select: { id: true, twoFactorEnabled: true, status: true },
+    });
+
+    if (user?.twoFactorEnabled && user.status === 'ACTIVE') {
+      await this.twoFactorAuthService.generateAndSendEmailOTP(dto.email);
+    }
+
+    return generic;
   }
 
   /**
@@ -605,53 +600,67 @@ export class AuthController {
    * Public endpoint - user provides email and recovery OTP
    */
   @Public()
-  @Throttle({ default: { ttl: 60000, limit: 50 } })
+  @Throttle({ default: { ttl: 60000, limit: 10 } })
   @Post('2fa/recovery/verify-email')
   @HttpCode(HttpStatus.OK)
   async verifyRecoveryEmail(
     @Body() dto: VerifyRecoveryEmailDto,
   ) {
     const isValid = await this.twoFactorAuthService.verifyEmailOTP(dto.email, dto.recoveryOtp);
-    
+
     if (!isValid) {
       throw new UnauthorizedException('Mã khôi phục không chính xác hoặc đã hết hạn');
     }
 
-    // Get user ID from email via Prisma
     const user = await this.prisma.user.findUnique({
       where: { email: dto.email },
-      select: { id: true },
+      select: { id: true, twoFactorEnabled: true, status: true },
     });
-    
-    if (!user) {
-      throw new UnauthorizedException('Người dùng không tồn tại');
+
+    if (!user?.twoFactorEnabled || user.status !== 'ACTIVE') {
+      throw new UnauthorizedException('Không thể khôi phục 2FA cho tài khoản này');
     }
 
-    // Generate recovery token for resetting 2FA
-    const recoveryToken = this.twoFactorAuthService.generateRecoveryToken(user.id, dto.email);
+    const recoveryToken = await this.twoFactorAuthService.generateRecoveryToken(
+      user.id,
+      dto.email,
+    );
 
     return {
       success: true,
       recoveryToken,
-      message: 'Xác minh email thành công. Bây giờ bạn có thể reset 2FA.',
-      nextStep: 'Gọi endpoint reset 2FA recovery với recovery token này',
+      message: 'Xác minh email thành công. Nhập mật khẩu tài khoản để reset 2FA.',
+      nextStep: 'Gọi endpoint reset 2FA recovery với recovery token + password',
     };
   }
 
   /**
    * RECOVERY FLOW: Reset 2FA after recovery email verification
    * POST /auth/2fa/recovery/reset
-   * Requires recoveryToken (from previous step)
+   * Requires recoveryToken (header) + account password (body)
    */
   @Public()
-  @Throttle({ default: { ttl: 60000, limit: 30 } })
+  @Throttle({ default: { ttl: 60000, limit: 5 } })
   @UseGuards(TwoFactorRecoveryGuard)
   @Post('2fa/recovery/reset')
   @HttpCode(HttpStatus.OK)
   async resetTwoFactorAfterRecovery(
     @User() user: any,
+    @Body() dto: ResetTwoFactorAfterRecoveryDto,
   ) {
-    // Disable 2FA for user
+    const passwordOk = await this.twoFactorAuthService.validatePassword(
+      user.userId,
+      dto.password,
+    );
+    if (!passwordOk) {
+      throw new UnauthorizedException('Mật khẩu không chính xác');
+    }
+
+    const consumed = await this.twoFactorAuthService.consumeChallenge(user.jti);
+    if (!consumed) {
+      throw new UnauthorizedException('Recovery token đã được sử dụng');
+    }
+
     await this.twoFactorAuthService.disableTwoFactor(user.userId, 'User requested recovery');
 
     return {
@@ -692,7 +701,7 @@ export class AuthController {
    * Yêu cầu: setupToken trong Authorization header, body: { secret, code }
    */
   @Public()
-  @Throttle({ default: { ttl: 60000, limit: 50 } })
+  @Throttle({ default: { ttl: 60000, limit: 10 } })
   @UseGuards(TwoFactorSetupGuard)
   @Post('2fa/me/enable/confirm')
   @HttpCode(HttpStatus.OK)
@@ -700,15 +709,32 @@ export class AuthController {
     @User() user: any,
     @Body() dto: ConfirmEnable2FADto,
   ) {
-    if (!user.totpSecret) {
-      throw new BadRequestException('Setup token không chứa secret. Vui lòng bắt đầu lại từ bước initiate.');
+    const totpSecret = user.totpSecret as string | undefined;
+    if (!totpSecret) {
+      throw new BadRequestException(
+        'Setup token không chứa secret. Vui lòng bắt đầu lại từ bước initiate.',
+      );
     }
 
-    if (dto.secret !== user.totpSecret) {
+    if (dto.secret && dto.secret !== totpSecret) {
       throw new BadRequestException('Secret không khớp với setup token.');
     }
 
-    const { backupCodes } = await this.twoFactorAuthService.confirmUserEnable2FA(user.userId, dto.secret, dto.code);
+    const isCodeValid = await this.twoFactorAuthService.verifyTOTPCode(totpSecret, dto.code);
+    if (!isCodeValid) {
+      throw new UnauthorizedException('Mã TOTP không chính xác. Vui lòng thử lại.');
+    }
+
+    const consumed = await this.twoFactorAuthService.consumeChallenge(user.jti);
+    if (!consumed) {
+      throw new UnauthorizedException('Setup token đã được sử dụng');
+    }
+
+    const { backupCodes } = await this.twoFactorAuthService.confirmUserEnable2FA(
+      user.userId,
+      totpSecret,
+      dto.code,
+    );
 
     return {
       success: true,
@@ -770,18 +796,31 @@ export class AuthController {
     @Body() dto: AdminResetTwoFactorDto,
     @User() adminUser: any,
   ) {
-    this.logger.log(`Admin ${adminUser.email} is resetting 2FA for user ${userId}. Reason: ${dto.reason || 'Not provided'}`);
+    this.logger.log(
+      `Admin ${adminUser.email} is resetting 2FA for user ${userId}. Reason: ${dto.reason || 'Not provided'}`,
+    );
 
-    // Disable 2FA for user
-    await this.twoFactorAuthService.disableTwoFactor(userId, `Admin reset by ${adminUser.email}: ${dto.reason || 'No reason provided'}`);
-
-    // Send notification email to user
-    const userData = await this.authService.getProfile(userId);
-    if (userData) {
-      void this.emailService.sendAdminResetNotification(userData.email, userData.fullName || undefined).catch((error) => {
-        this.logger.error('Failed to send admin reset notification in background', error instanceof Error ? error.stack : undefined);
-      });
+    const userData = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, fullName: true },
+    });
+    if (!userData) {
+      throw new NotFoundException(`User ${userId} không tồn tại`);
     }
+
+    await this.twoFactorAuthService.disableTwoFactor(
+      userId,
+      `Admin reset by ${adminUser.email}: ${dto.reason || 'No reason provided'}`,
+    );
+
+    void this.emailService
+      .sendAdminResetNotification(userData.email, userData.fullName || undefined)
+      .catch((error) => {
+        this.logger.error(
+          'Failed to send admin reset notification in background',
+          error instanceof Error ? error.stack : undefined,
+        );
+      });
 
     return {
       success: true,

@@ -1,15 +1,11 @@
 import { Injectable, CanActivate, ExecutionContext, UnauthorizedException } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
-import { ConfigService } from '@nestjs/config';
+import { AuthChallengeService } from '../services/auth-challenge.service';
 
 @Injectable()
 export class TwoFactorSetupGuard implements CanActivate {
-  constructor(
-    private jwtService: JwtService,
-    private configService: ConfigService,
-  ) {}
+  constructor(private readonly challengeService: AuthChallengeService) {}
 
-  canActivate(context: ExecutionContext): boolean {
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
     const authHeader = request.headers.authorization;
 
@@ -18,27 +14,18 @@ export class TwoFactorSetupGuard implements CanActivate {
     }
 
     const token = authHeader.split(' ')[1];
-
-    try {
-      const secret = this.configService.get<string>('JWT_SECRET') || 'your-secret-key';
-      const payload = this.jwtService.verify(token, {
-        secret,
-      });
-
-      if (payload.type !== 'setup-2fa') {
-        throw new UnauthorizedException('Invalid token type');
-      }
-
-      // Attach user info to request (including TOTP secret if present)
-      request.user = {
-        userId: payload.sub,
-        email: payload.email,
-        totpSecret: payload.totpSecret,
-      };
-
-      return true;
-    } catch (error) {
-      throw new UnauthorizedException('Invalid or expired setup token');
+    if (!token) {
+      throw new UnauthorizedException('Setup token is missing');
     }
+
+    const challenge = await this.challengeService.validate(token, 'setup-2fa');
+    request.user = {
+      userId: challenge.userId,
+      email: challenge.email,
+      totpSecret: challenge.totpSecret,
+      jti: challenge.jti,
+    };
+    request.challengeToken = token;
+    return true;
   }
 }

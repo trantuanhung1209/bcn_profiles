@@ -8,16 +8,12 @@ import {
   AuthSessionCacheService,
   CachedAuthUser,
 } from '../services/auth-session-cache.service';
+import { TokenRevocationService } from '../services/token-revocation.service';
 
 type AccessTokenPayload = {
   sub?: string;
-  email?: string;
-  role?: string;
-  fullName?: string | null;
-  avatar?: string | null;
-  status?: string;
-  createdAt?: string;
-  updatedAt?: string;
+  type?: string;
+  jti?: string;
 };
 
 @Injectable()
@@ -28,13 +24,19 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     private prisma: PrismaService,
     private configService: ConfigService,
     private readonly sessionCache: AuthSessionCacheService,
+    private readonly tokenRevocation: TokenRevocationService,
   ) {
+    const secret = configService.get<string>('JWT_SECRET')?.trim();
+    if (!secret) {
+      throw new Error('JWT_SECRET environment variable is required');
+    }
+
     super({
       jwtFromRequest: ExtractJwt.fromExtractors([
         (request: Request) => request?.cookies?.access_token,
       ]),
       ignoreExpiration: false,
-      secretOrKey: configService.get<string>('JWT_SECRET') || 'your-secret-key',
+      secretOrKey: secret,
       passReqToCallback: true,
     });
   }
@@ -46,7 +48,16 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         throw new UnauthorizedException('Token không hợp lệ');
       }
 
-      const user = await this.resolveUser(userId, payload);
+      // Reject refresh / challenge tokens used as access tokens.
+      if (payload.type && payload.type !== 'access') {
+        throw new UnauthorizedException('Token không hợp lệ');
+      }
+
+      if (await this.tokenRevocation.isRevoked(payload.jti)) {
+        throw new UnauthorizedException('Token đã bị thu hồi');
+      }
+
+      const user = await this.resolveUser(userId);
       if (!user) {
         throw new UnauthorizedException('Người dùng không tồn tại');
       }
@@ -66,22 +77,13 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     }
   }
 
-  private async resolveUser(
-    userId: string,
-    payload: AccessTokenPayload,
-  ): Promise<CachedAuthUser | null> {
+  private async resolveUser(userId: string): Promise<CachedAuthUser | null> {
     const cached = this.sessionCache.getUser(userId);
     if (cached) {
       return cached;
     }
 
-    const fromToken = this.userFromAccessToken(payload);
-    if (fromToken) {
-      this.sessionCache.setUser(fromToken);
-      return fromToken;
-    }
-
-    // Backward-compat for older tokens that only had sub/email/role.
+    // Always load authoritative role/status from DB — never trust JWT claims alone.
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -102,22 +104,5 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
     this.sessionCache.setUser(user);
     return user;
-  }
-
-  private userFromAccessToken(payload: AccessTokenPayload): CachedAuthUser | null {
-    if (!payload.sub || !payload.email || !payload.role || !payload.status) {
-      return null;
-    }
-
-    return {
-      id: payload.sub,
-      email: payload.email,
-      fullName: payload.fullName ?? null,
-      avatar: payload.avatar ?? null,
-      role: payload.role,
-      status: payload.status,
-      createdAt: payload.createdAt ? new Date(payload.createdAt) : new Date(0),
-      updatedAt: payload.updatedAt ? new Date(payload.updatedAt) : new Date(0),
-    };
   }
 }

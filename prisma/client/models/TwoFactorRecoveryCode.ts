@@ -381,10 +381,6 @@ export type TwoFactorRecoveryCodeUncheckedUpdateManyWithoutUserNestedInput = {
   deleteMany?: Prisma.TwoFactorRecoveryCodeScalarWhereInput | Prisma.TwoFactorRecoveryCodeScalarWhereInput[]
 }
 
-export type NullableDateTimeFieldUpdateOperationsInput = {
-  set?: Date | string | null
-}
-
 export type TwoFactorRecoveryCodeCreateWithoutUserInput = {
   id?: string
   code: string

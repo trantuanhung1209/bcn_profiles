@@ -1,11 +1,17 @@
-import { Injectable, BadRequestException, UnauthorizedException, Logger } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
-import { ConfigService } from '@nestjs/config';
+import {
+  Injectable,
+  BadRequestException,
+  UnauthorizedException,
+  Logger,
+} from '@nestjs/common';
 import * as speakeasy from 'speakeasy';
 import * as QRCode from 'qrcode';
 import * as bcrypt from 'bcrypt';
+import { randomInt, randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { EmailService } from './email.service';
+import { AuthChallengeService } from './auth-challenge.service';
+import { decryptSecret, encryptSecret } from '../utils/secret-crypto';
 
 @Injectable()
 export class TwoFactorAuthService {
@@ -14,13 +20,9 @@ export class TwoFactorAuthService {
   constructor(
     private readonly prismaService: PrismaService,
     private readonly emailService: EmailService,
-    private readonly jwtService: JwtService,
-    private readonly configService: ConfigService,
+    private readonly challengeService: AuthChallengeService,
   ) {}
 
-  /**
-   * Generate TOTP secret and QR code for initial setup
-   */
   async generateTOTPSecret(email: string): Promise<{ secret: string; qrCode: string }> {
     const secret = speakeasy.generateSecret({
       name: `BCN Profiles (${email})`,
@@ -28,7 +30,6 @@ export class TwoFactorAuthService {
       length: 32,
     });
 
-    // Generate QR code
     const qrCodeUrl = secret.otpauth_url || '';
     const qrCode = await QRCode.toDataURL(qrCodeUrl);
 
@@ -38,62 +39,37 @@ export class TwoFactorAuthService {
     };
   }
 
-  /**
-   * Verify TOTP code against secret
-   */
   async verifyTOTPCode(secret: string, code: string): Promise<boolean> {
-    // Accept codes from -1 to +1 time windows for clock skew tolerance
-    const isValid = speakeasy.totp.verify({
+    return speakeasy.totp.verify({
       secret,
       encoding: 'base32',
       token: code,
       window: 1,
     });
-
-    return isValid;
   }
 
-  /**
-   * Generate backup recovery codes (10 codes)
-   */
   async generateBackupCodes(count: number = 10): Promise<string[]> {
+    const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     const codes: string[] = [];
     for (let i = 0; i < count; i++) {
-      // Generate 8-character alphanumeric code
-      const code = Math.random()
-        .toString(36)
-        .substring(2, 10)
-        .toUpperCase();
+      let code = '';
+      for (let j = 0; j < 8; j++) {
+        code += alphabet[randomInt(alphabet.length)];
+      }
       codes.push(code);
     }
     return codes;
   }
 
-  /**
-   * Hash backup codes for storage
-   */
   async hashBackupCodes(codes: string[]): Promise<string[]> {
     return Promise.all(codes.map((code) => bcrypt.hash(code, 10)));
   }
 
-  /**
-   * Verify backup code against hashed codes
-   */
   async verifyBackupCode(plainCode: string, hashedCode: string): Promise<boolean> {
-    return await bcrypt.compare(plainCode, hashedCode);
+    return bcrypt.compare(plainCode, hashedCode);
   }
 
-  /**
-   * Save TOTP secret for user and enable 2FA.
-   * Backup codes are stored exclusively in the TwoFactorRecoveryCode table
-   * (via storeRecoveryCodes) — not duplicated in metadata.
-   * Merges into existing metadata instead of overwriting.
-   */
-  async enableTwoFactor(
-    userId: string,
-    totpSecret: string,
-  ): Promise<void> {
-    // Fetch existing metadata to merge into
+  async enableTwoFactor(userId: string, totpSecret: string): Promise<void> {
     const existing = await this.prismaService.user.findUnique({
       where: { id: userId },
       select: { metadata: true },
@@ -108,7 +84,7 @@ export class TwoFactorAuthService {
       where: { id: userId },
       data: {
         twoFactorEnabled: true,
-        totpSecret,
+        totpSecret: encryptSecret(totpSecret),
         metadata: {
           ...existingMetadata,
           twoFactorEnabledAt: new Date().toISOString(),
@@ -117,12 +93,7 @@ export class TwoFactorAuthService {
     });
   }
 
-  /**
-   * Disable 2FA for user (admin or recovery).
-   * Merges disable info into existing metadata instead of overwriting.
-   */
   async disableTwoFactor(userId: string, reason?: string): Promise<void> {
-    // Fetch existing metadata to merge into
     const existing = await this.prismaService.user.findUnique({
       where: { id: userId },
       select: { metadata: true },
@@ -133,89 +104,106 @@ export class TwoFactorAuthService {
         ? (existing.metadata as Record<string, unknown>)
         : {};
 
-    await this.prismaService.user.update({
-      where: { id: userId },
-      data: {
-        twoFactorEnabled: false,
-        totpSecret: null,
-        metadata: {
-          ...existingMetadata,
-          twoFactorDisabledAt: new Date().toISOString(),
-          twoFactorDisabledReason: reason || 'User requested reset',
+    await this.prismaService.$transaction([
+      this.prismaService.user.update({
+        where: { id: userId },
+        data: {
+          twoFactorEnabled: false,
+          totpSecret: null,
+          metadata: {
+            ...existingMetadata,
+            twoFactorDisabledAt: new Date().toISOString(),
+            twoFactorDisabledReason: reason || 'User requested reset',
+          },
         },
-      },
-    });
+      }),
+      this.prismaService.twoFactorRecoveryCode.deleteMany({ where: { userId } }),
+      this.prismaService.authChallenge.deleteMany({
+        where: {
+          userId,
+          type: { in: ['setup-2fa', 'verify-2fa', 'recovery-2fa'] },
+          usedAt: null,
+        },
+      }),
+    ]);
   }
 
-  /**
-   * Get unused backup codes for a user
-   */
   async getUnusedBackupCodes(userId: string): Promise<string[]> {
     const codes = await this.prismaService.twoFactorRecoveryCode.findMany({
       where: { userId, isUsed: false },
       select: { code: true },
     });
-    return codes.map((c: { code: string }) => c.code);
+    return codes.map((c) => c.code);
   }
 
-  /**
-   * Mark backup code as used
-   */
   async markBackupCodeAsUsed(userId: string, plainCode: string): Promise<boolean> {
-    // Get all unused backup codes
     const unusedCodes = await this.prismaService.twoFactorRecoveryCode.findMany({
       where: { userId, isUsed: false },
       select: { id: true, code: true },
     });
 
-    // Find and mark matching code as used
     for (const codeRecord of unusedCodes) {
       const isMatch = await this.verifyBackupCode(plainCode, codeRecord.code);
-      if (isMatch) {
-        await this.prismaService.twoFactorRecoveryCode.update({
-          where: { id: codeRecord.id },
-          data: { isUsed: true, usedAt: new Date() },
-        });
-        return true;
-      }
+      if (!isMatch) continue;
+
+      const updated = await this.prismaService.twoFactorRecoveryCode.updateMany({
+        where: { id: codeRecord.id, isUsed: false },
+        data: { isUsed: true, usedAt: new Date() },
+      });
+      return updated.count === 1;
     }
 
     return false;
   }
 
-  /**
-   * Generate and send email OTP for 2FA verification
-   */
-  async generateAndSendEmailOTP(email: string): Promise<string> {
-    // Generate 6-digit OTP
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-
-    // Store in PasswordReset table (can be reused for OTP)
-    const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+  async generateAndSendEmailOTP(email: string): Promise<void> {
+    const otp = randomInt(100000, 1000000).toString();
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+    const otpHash = await bcrypt.hash(otp, 10);
 
     await this.prismaService.passwordReset.create({
       data: {
-        id: `2fa-email-${Date.now()}-${Math.random()}`,
+        id: `2fa-email-${randomUUID()}`,
         email,
-        otp,
+        otp: otpHash,
         expiresAt,
         isUsed: false,
       },
     });
 
-    // Dispatch email sending in background so API does not wait for SMTP round-trip.
     void this.emailService.sendTwoFactorOTP(email, otp).catch((error) => {
-      this.logger.error('Failed to send 2FA OTP email in background', error instanceof Error ? error.stack : undefined);
+      this.logger.error(
+        'Failed to send 2FA OTP email in background',
+        error instanceof Error ? error.stack : undefined,
+      );
     });
-
-    return otp; // Return for testing purposes, in production should not return
   }
 
-  /**
-   * Verify email OTP
-   */
   async verifyEmailOTP(email: string, otp: string): Promise<boolean> {
-    const record = await this.prismaService.passwordReset.findFirst({
+    const records = await this.prismaService.passwordReset.findMany({
+      where: {
+        email,
+        isUsed: false,
+        expiresAt: { gt: new Date() },
+        id: { startsWith: '2fa-email-' },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 5,
+    });
+
+    for (const record of records) {
+      const match = await bcrypt.compare(otp, record.otp);
+      if (!match) continue;
+
+      const updated = await this.prismaService.passwordReset.updateMany({
+        where: { id: record.id, isUsed: false },
+        data: { isUsed: true },
+      });
+      return updated.count === 1;
+    }
+
+    // Backward-compat: older plaintext OTP rows
+    const legacy = await this.prismaService.passwordReset.findFirst({
       where: {
         email,
         otp,
@@ -223,200 +211,71 @@ export class TwoFactorAuthService {
         expiresAt: { gt: new Date() },
       },
     });
+    if (!legacy) return false;
 
-    if (!record) {
-      return false;
-    }
-
-    // Mark as used
-    await this.prismaService.passwordReset.update({
-      where: { id: record.id },
+    const updated = await this.prismaService.passwordReset.updateMany({
+      where: { id: legacy.id, isUsed: false },
       data: { isUsed: true },
     });
-
-    return true;
+    return updated.count === 1;
   }
 
-  /**
-   * Validate password before allowing 2FA setup
-   */
   async validatePassword(userId: string, password: string): Promise<boolean> {
     const user = await this.prismaService.user.findUnique({
       where: { id: userId },
       select: { password: true },
     });
 
-    if (!user || !user.password) {
-      return false;
-    }
-
-    return await bcrypt.compare(password, user.password);
+    if (!user?.password) return false;
+    return bcrypt.compare(password, user.password);
   }
 
-  /**
-   * Generate setup token that allows access to setup endpoints
-   */
-  generateSetupToken(userId: string, email: string): string {
-    const secret = this.configService.get<string>('JWT_SECRET') || 'your-secret-key';
-    return this.jwtService.sign(
-      {
-        sub: userId,
-        email,
-        type: 'setup-2fa',
-      },
-      {
-        secret,
-        expiresIn: '15m',
-      },
-    );
+  generateSetupToken(userId: string, email: string): Promise<string> {
+    return this.challengeService.issue('setup-2fa', userId, email, 15 * 60);
   }
 
-  /**
-   * Generate setup token with TOTP secret
-   */
-  generateSetupTokenWithSecret(userId: string, email: string, secret: string): string {
-    const jwtSecret = this.configService.get<string>('JWT_SECRET') || 'your-secret-key';
-    return this.jwtService.sign(
-      {
-        sub: userId,
-        email,
-        type: 'setup-2fa',
-        totpSecret: secret,
-      },
-      {
-        secret: jwtSecret,
-        expiresIn: '15m',
-      },
-    );
+  generateSetupTokenWithSecret(
+    userId: string,
+    email: string,
+    secret: string,
+  ): Promise<string> {
+    return this.challengeService.issue('setup-2fa', userId, email, 15 * 60, secret);
   }
 
-  /**
-   * Generate verification token for 2FA verification flow
-   */
-  generateVerificationToken(userId: string, email: string): string {
-    const secret = this.configService.get<string>('JWT_SECRET') || 'your-secret-key';
-    return this.jwtService.sign(
-      {
-        sub: userId,
-        email,
-        type: 'verify-2fa',
-      },
-      {
-        secret,
-        expiresIn: '5m', // Verification token expires in 5 minutes
-      },
-    );
+  generateVerificationToken(userId: string, email: string): Promise<string> {
+    return this.challengeService.issue('verify-2fa', userId, email, 5 * 60);
   }
 
-  /**
-   * Generate recovery token for recovery email flow
-   */
-  generateRecoveryToken(userId: string, email: string): string {
-    const secret = this.configService.get<string>('JWT_SECRET') || 'your-secret-key';
-    return this.jwtService.sign(
-      {
-        sub: userId,
-        email,
-        type: 'recovery-2fa',
-      },
-      {
-        secret,
-        expiresIn: '30m', // Recovery token expires in 30 minutes
-      },
-    );
+  generateRecoveryToken(userId: string, email: string): Promise<string> {
+    return this.challengeService.issue('recovery-2fa', userId, email, 30 * 60);
   }
 
-  /**
-   * Validate setup token and get TOTP secret
-   */
-  validateSetupTokenAndGetSecret(token: string): { userId: string; email: string; totpSecret: string } {
-    const secret = this.configService.get<string>('JWT_SECRET') || 'your-secret-key';
-    try {
-      const payload = this.jwtService.verify(token, {
-        secret,
-      });
-
-      if (payload.type !== 'setup-2fa') {
-        throw new UnauthorizedException('Invalid token type');
-      }
-
-      return {
-        userId: payload.sub,
-        email: payload.email,
-        totpSecret: payload.totpSecret,
-      };
-    } catch (error) {
-      throw new UnauthorizedException('Invalid or expired setup token');
-    }
+  validateSetupTokenAndGetSecret(token: string) {
+    return this.challengeService.validate(token, 'setup-2fa');
   }
 
-  /**
-   * Validate verification token
-   */
-  validateVerificationToken(token: string): { userId: string; email: string } {
-    const secret = this.configService.get<string>('JWT_SECRET') || 'your-secret-key';
-    try {
-      const payload = this.jwtService.verify(token, {
-        secret,
-      });
-
-      if (payload.type !== 'verify-2fa') {
-        throw new UnauthorizedException('Invalid token type');
-      }
-
-      return {
-        userId: payload.sub,
-        email: payload.email,
-      };
-    } catch (error) {
-      throw new UnauthorizedException('Invalid or expired verification token');
-    }
+  validateVerificationToken(token: string) {
+    return this.challengeService.validate(token, 'verify-2fa');
   }
 
-  /**
-   * Validate recovery token
-   */
-  validateRecoveryToken(token: string): { userId: string; email: string } {
-    const secret = this.configService.get<string>('JWT_SECRET') || 'your-secret-key';
-    try {
-      const payload = this.jwtService.verify(token, {
-        secret,
-      });
-
-      if (payload.type !== 'recovery-2fa') {
-        throw new UnauthorizedException('Invalid token type');
-      }
-
-      return {
-        userId: payload.sub,
-        email: payload.email,
-      };
-    } catch (error) {
-      throw new UnauthorizedException('Invalid or expired recovery token');
-    }
+  validateRecoveryToken(token: string) {
+    return this.challengeService.validate(token, 'recovery-2fa');
   }
 
-  /**
-   * Store recovery codes in database for one-time use tracking
-   */
+  consumeChallenge(jti: string) {
+    return this.challengeService.consume(jti);
+  }
+
   async storeRecoveryCodes(userId: string, codes: string[]): Promise<void> {
-    // Delete old unused recovery codes
     await this.prismaService.twoFactorRecoveryCode.deleteMany({
-      where: {
-        userId,
-        isUsed: false,
-      },
+      where: { userId, isUsed: false },
     });
 
-    // Hash and store new codes
     const hashedCodes = await Promise.all(
-      codes.map(async (code) => {
-        const hashed = await bcrypt.hash(code, 10);
-        return {
-          userId,
-          code: hashed,
-        };
-      }),
+      codes.map(async (code) => ({
+        userId,
+        code: await bcrypt.hash(code, 10),
+      })),
     );
 
     await this.prismaService.twoFactorRecoveryCode.createMany({
@@ -424,33 +283,23 @@ export class TwoFactorAuthService {
     });
   }
 
-  /**
-   * Get TOTP secret for a user (for verification)
-   */
   async getTOTPSecret(userId: string): Promise<string | null> {
     const user = await this.prismaService.user.findUnique({
       where: { id: userId },
       select: { totpSecret: true },
     });
-
-    return user?.totpSecret || null;
+    if (!user?.totpSecret) return null;
+    return decryptSecret(user.totpSecret);
   }
 
-  /**
-   * Check if user has 2FA enabled
-   */
   async isTwoFactorEnabled(userId: string): Promise<boolean> {
     const user = await this.prismaService.user.findUnique({
       where: { id: userId },
       select: { twoFactorEnabled: true },
     });
-
     return user?.twoFactorEnabled || false;
   }
 
-  /**
-   * Get user 2FA status
-   */
   async getTwoFactorStatus(userId: string): Promise<{
     enabled: boolean;
     required: boolean;
@@ -462,10 +311,7 @@ export class TwoFactorAuthService {
         select: { twoFactorEnabled: true, twoFactorRequired: true },
       }),
       this.prismaService.twoFactorRecoveryCode.count({
-        where: {
-          userId,
-          isUsed: false,
-        },
+        where: { userId, isUsed: false },
       }),
     ]);
 
@@ -476,9 +322,6 @@ export class TwoFactorAuthService {
     };
   }
 
-  /**
-   * Enforce 2FA requirement for a user (admin only)
-   */
   async setTwoFactorRequired(userId: string, required: boolean): Promise<void> {
     await this.prismaService.user.update({
       where: { id: userId },
@@ -486,32 +329,26 @@ export class TwoFactorAuthService {
     });
   }
 
-  /**
-   * Initiate voluntary 2FA enable flow: generate secret & QR, return setupToken with secret
-   * Does NOT save anything to DB yet — confirmed on /2fa/enable/confirm
-   */
-  async initiateUserEnable2FA(userId: string, email: string, password: string): Promise<{
-    secret: string;
-    qrCode: string;
-    setupToken: string;
-  }> {
+  async initiateUserEnable2FA(
+    userId: string,
+    email: string,
+    password: string,
+  ): Promise<{ secret: string; qrCode: string; setupToken: string }> {
     const isPasswordValid = await this.validatePassword(userId, password);
     if (!isPasswordValid) {
       throw new UnauthorizedException('Mật khẩu không chính xác');
     }
 
     const { secret, qrCode } = await this.generateTOTPSecret(email);
-    const setupToken = this.generateSetupTokenWithSecret(userId, email, secret);
-
+    const setupToken = await this.generateSetupTokenWithSecret(userId, email, secret);
     return { secret, qrCode, setupToken };
   }
 
-  /**
-   * Confirm voluntary 2FA enable: verify TOTP code, save to DB, return backup codes
-   */
-  async confirmUserEnable2FA(userId: string, totpSecret: string, totpCode: string): Promise<{
-    backupCodes: string[];
-  }> {
+  async confirmUserEnable2FA(
+    userId: string,
+    totpSecret: string,
+    totpCode: string,
+  ): Promise<{ backupCodes: string[] }> {
     const isCodeValid = await this.verifyTOTPCode(totpSecret, totpCode);
     if (!isCodeValid) {
       throw new UnauthorizedException('Mã TOTP không chính xác. Vui lòng thử lại.');
@@ -520,13 +357,9 @@ export class TwoFactorAuthService {
     const backupCodes = await this.generateBackupCodes(10);
     await this.enableTwoFactor(userId, totpSecret);
     await this.storeRecoveryCodes(userId, backupCodes);
-
     return { backupCodes };
   }
 
-  /**
-   * User voluntarily disables their own 2FA (not admin reset)
-   */
   async userDisable2FA(userId: string, password: string, totpCode: string): Promise<void> {
     const isPasswordValid = await this.validatePassword(userId, password);
     if (!isPasswordValid) {
@@ -535,7 +368,9 @@ export class TwoFactorAuthService {
 
     const isRequired = await this.isTwoFactorRequired(userId);
     if (isRequired) {
-      throw new BadRequestException('Tài khoản của bạn bắt buộc phải sử dụng 2FA. Liên hệ admin để gỡ yêu cầu này.');
+      throw new BadRequestException(
+        'Tài khoản của bạn bắt buộc phải sử dụng 2FA. Liên hệ admin để gỡ yêu cầu này.',
+      );
     }
 
     const totpSecret = await this.getTOTPSecret(userId);
@@ -551,15 +386,11 @@ export class TwoFactorAuthService {
     await this.disableTwoFactor(userId, 'User disabled voluntarily');
   }
 
-  /**
-   * Get 2FA requirement status for a user
-   */
   async isTwoFactorRequired(userId: string): Promise<boolean> {
     const user = await this.prismaService.user.findUnique({
       where: { id: userId },
       select: { twoFactorRequired: true },
     });
-
     return user?.twoFactorRequired || false;
   }
 }

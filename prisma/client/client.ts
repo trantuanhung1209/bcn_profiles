@@ -50,6 +50,11 @@ export type PasswordReset = Prisma.PasswordResetModel
  */
 export type TokenBlacklist = Prisma.TokenBlacklistModel
 /**
+ * Model AuthChallenge
+ * Single-use challenge tokens for 2FA setup / verify / recovery.
+ */
+export type AuthChallenge = Prisma.AuthChallengeModel
+/**
  * Model User
  * 
  */

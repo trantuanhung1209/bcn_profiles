@@ -10,6 +10,7 @@
  */
 export type * from './models/PasswordReset.js'
 export type * from './models/TokenBlacklist.js'
+export type * from './models/AuthChallenge.js'
 export type * from './models/User.js'
 export type * from './models/TwoFactorRecoveryCode.js'
 export type * from './models/TimelineEvent.js'

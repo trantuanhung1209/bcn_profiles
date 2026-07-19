@@ -11,6 +11,21 @@ import { randomUUID } from 'crypto';
 import { RequestEmailChangeDto } from './dto/request-email-change.dto';
 import { ConfirmEmailChangeDto } from './dto/confirm-email-change.dto';
 import { TwoFactorAuthService } from './services/two-factor-auth.service';
+import {
+  AuthSessionCacheService,
+  CachedAuthUser,
+} from './services/auth-session-cache.service';
+
+type TokenUser = {
+  id: string;
+  email: string;
+  fullName: string | null;
+  avatar: string | null;
+  role: string;
+  status: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+};
 
 @Injectable()
 export class AuthService {
@@ -21,6 +36,7 @@ export class AuthService {
     private jwtService: JwtService,
     private emailService: EmailService,
     private twoFactorAuthService: TwoFactorAuthService,
+    private readonly sessionCache: AuthSessionCacheService,
   ) {}
 
   async validateUser(email: string, password: string): Promise<any> {
@@ -156,6 +172,8 @@ export class AuthService {
         avatar: true,
         role: true,
         status: true,
+        createdAt: true,
+        updatedAt: true,
       },
     });
 
@@ -163,23 +181,10 @@ export class AuthService {
       throw new UnauthorizedException('Người dùng không tồn tại');
     }
 
-    const payload = {
-      email: user.email,
-      sub: user.id,
-      role: user.role,
-    };
-
-    const access_token = this.jwtService.sign(payload, {
-      expiresIn: '60m',
-    });
-
-    const refresh_token = this.jwtService.sign(payload, {
-      expiresIn: '7d',
-    });
+    const tokens = this.issueTokenPair(user);
 
     return {
-      access_token,
-      refresh_token,
+      ...tokens,
       user: {
         id: user.id,
         email: user.email,
@@ -205,6 +210,8 @@ export class AuthService {
           avatar: true,
           role: true,
           status: true,
+          createdAt: true,
+          updatedAt: true,
         },
       });
 
@@ -219,24 +226,10 @@ export class AuthService {
         throw new UnauthorizedException('Tài khoản đã bị khóa. Vui lòng liên hệ admin.');
       }
 
-      // Tạo tokens mới
-      const newPayload = { 
-        email: user.email, 
-        sub: user.id,
-        role: user.role, // Thêm role vào payload mới
-      };
-      
-      const access_token = this.jwtService.sign(newPayload, {
-        expiresIn: '60m',
-      });
-
-      const refresh_token = this.jwtService.sign(newPayload, {
-        expiresIn: '7d',
-      });
+      const tokens = this.issueTokenPair(user);
 
       return {
-        access_token,
-        refresh_token,
+        ...tokens,
         user,
       };
     } catch (error) {
@@ -549,24 +542,10 @@ export class AuthService {
       throw new UnauthorizedException('Tài khoản đã bị khóa. Vui lòng liên hệ admin.');
     }
 
-    // Tạo JWT tokens
-    const payload = { 
-      email: user.email, 
-      sub: user.id,
-      role: user.role,
-    };
-    
-    const access_token = this.jwtService.sign(payload, {
-      expiresIn: '60m',
-    });
+    const tokens = this.issueTokenPair(user);
 
-    const refresh_token = this.jwtService.sign(payload, {
-      expiresIn: '7d',
-    });
-    
     return {
-      access_token,
-      refresh_token,
+      ...tokens,
       user: {
         id: user.id,
         email: user.email,
@@ -574,6 +553,43 @@ export class AuthService {
         avatar: user.avatar,
         role: user.role,
       },
+    };
+  }
+
+  private issueTokenPair(user: TokenUser): {
+    access_token: string;
+    refresh_token: string;
+  } {
+    const cachedUser = this.toCachedAuthUser(user);
+    this.sessionCache.setUser(cachedUser);
+
+    const payload = {
+      sub: user.id,
+      email: user.email,
+      role: user.role,
+      fullName: user.fullName,
+      avatar: user.avatar,
+      status: user.status,
+      createdAt: cachedUser.createdAt.toISOString(),
+      updatedAt: cachedUser.updatedAt.toISOString(),
+    };
+
+    return {
+      access_token: this.jwtService.sign(payload, { expiresIn: '60m' }),
+      refresh_token: this.jwtService.sign(payload, { expiresIn: '7d' }),
+    };
+  }
+
+  private toCachedAuthUser(user: TokenUser): CachedAuthUser {
+    return {
+      id: user.id,
+      email: user.email,
+      fullName: user.fullName,
+      avatar: user.avatar,
+      role: user.role,
+      status: user.status,
+      createdAt: user.createdAt ?? new Date(),
+      updatedAt: user.updatedAt ?? new Date(),
     };
   }
 }

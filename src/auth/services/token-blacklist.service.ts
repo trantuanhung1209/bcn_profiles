@@ -1,12 +1,28 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { AuthSessionCacheService } from './auth-session-cache.service';
 
 @Injectable()
-export class TokenBlacklistService {
+export class TokenBlacklistService implements OnModuleInit {
   private readonly logger = new Logger(TokenBlacklistService.name);
 
-  constructor(private prisma: PrismaService) {}
+  /**
+   * When true (default), unknown tokens are treated as not-blacklisted without a DB
+   * round-trip. Persisted blacklist rows are loaded on boot; logout still writes DB
+   * + memory so the current process stays correct immediately.
+   */
+  private readonly trustMemoryMisses =
+    (process.env.AUTH_BLACKLIST_TRUST_MEMORY ?? 'true').toLowerCase() !== 'false';
+
+  constructor(
+    private prisma: PrismaService,
+    private readonly sessionCache: AuthSessionCacheService,
+  ) {}
+
+  async onModuleInit(): Promise<void> {
+    await this.preloadActiveBlacklist();
+  }
 
   /**
    * Thêm token vào blacklist
@@ -16,6 +32,10 @@ export class TokenBlacklistService {
   async addToBlacklist(token: string, expiresInHours: number = 24): Promise<void> {
     const expiresAt = new Date();
     expiresAt.setHours(expiresAt.getHours() + expiresInHours);
+    const ttlMs = Math.max(expiresAt.getTime() - Date.now(), 1_000);
+
+    // Cache first so subsequent requests on this process deny immediately.
+    this.sessionCache.markBlacklisted(token, ttlMs);
 
     await this.prisma.tokenBlacklist.create({
       data: {
@@ -33,23 +53,60 @@ export class TokenBlacklistService {
    * @returns true nếu token bị blacklist
    */
   async isBlacklisted(token: string): Promise<boolean> {
-    const blacklistedToken = await this.prisma.tokenBlacklist.findUnique({
-      where: { token },
-    });
-
-    // Nếu tìm thấy và chưa hết hạn
-    if (blacklistedToken) {
-      if (new Date() < blacklistedToken.expiresAt) {
-        return true;
-      } else {
-        // Token đã hết hạn, xóa luôn
-        await this.prisma.tokenBlacklist.delete({
-          where: { token },
-        });
-      }
+    const cached = this.sessionCache.getBlacklistState(token);
+    if (cached !== undefined) {
+      return cached;
     }
 
+    if (this.trustMemoryMisses) {
+      // Fast path for first request after login: avoid DigitalOcean RTT.
+      this.sessionCache.markNotBlacklisted(token);
+      return false;
+    }
+
+    const blacklistedToken = await this.prisma.tokenBlacklist.findUnique({
+      where: { token },
+      select: { expiresAt: true },
+    });
+
+    if (blacklistedToken) {
+      const ttlMs = blacklistedToken.expiresAt.getTime() - Date.now();
+      if (ttlMs > 0) {
+        this.sessionCache.markBlacklisted(token, ttlMs);
+        return true;
+      }
+
+      await this.prisma.tokenBlacklist.delete({
+        where: { token },
+      });
+    }
+
+    this.sessionCache.markNotBlacklisted(token);
     return false;
+  }
+
+  async preloadActiveBlacklist(): Promise<void> {
+    try {
+      const now = new Date();
+      const rows = await this.prisma.tokenBlacklist.findMany({
+        where: { expiresAt: { gt: now } },
+        select: { token: true, expiresAt: true },
+      });
+
+      for (const row of rows) {
+        this.sessionCache.markBlacklisted(
+          row.token,
+          Math.max(row.expiresAt.getTime() - Date.now(), 1_000),
+        );
+      }
+
+      this.logger.log(`Preloaded ${rows.length} active blacklist token(s) into memory`);
+    } catch (error) {
+      this.logger.error(
+        'Failed to preload token blacklist',
+        error instanceof Error ? error.stack : undefined,
+      );
+    }
   }
 
   /**
@@ -61,11 +118,13 @@ export class TokenBlacklistService {
     const result = await this.prisma.tokenBlacklist.deleteMany({
       where: {
         expiresAt: {
-          lt: new Date(), // Xóa các token có expiresAt < hiện tại
+          lt: new Date(),
         },
       },
     });
 
+    this.sessionCache.clearBlacklist();
+    await this.preloadActiveBlacklist();
     this.logger.log(`Cleaned up ${result.count} expired tokens from blacklist`);
   }
 
@@ -81,6 +140,8 @@ export class TokenBlacklistService {
       },
     });
 
+    this.sessionCache.clearBlacklist();
+    await this.preloadActiveBlacklist();
     return result.count;
   }
 }

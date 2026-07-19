@@ -1,4 +1,4 @@
-import { IsEmail, IsString, Length } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsString, Length, MinLength } from 'class-validator';
 
 // Step 1: Request recovery
 export class TwoFactorRecoveryRequestDto {
@@ -16,10 +16,12 @@ export class VerifyRecoveryEmailDto {
   recoveryOtp: string;
 }
 
-// Step 3: Reset 2FA after recovery verification
+// Step 3: Reset 2FA after recovery verification — requires account password
 export class ResetTwoFactorAfterRecoveryDto {
   @IsString()
-  recoveryToken: string; // JWT token from recovery email verification
+  @IsNotEmpty({ message: 'Mật khẩu không được để trống' })
+  @MinLength(6)
+  password: string;
 }
 
 // Response type when recovery is successful (not using validators for response)

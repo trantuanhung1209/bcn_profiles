@@ -7,8 +7,8 @@ Backend API cho hệ thống quản lý hồ sơ học viên BCN, xác thực ng
 BCN Profiles được xây dựng theo kiến trúc module của NestJS, tập trung vào:
 
 - Quản lý người dùng và trạng thái tài khoản (`PENDING`, `ACTIVE`, `BLOCKED`)
-- Xác thực đa phương thức (Email/Password, Google OAuth)
-- Bảo mật phiên với JWT access/refresh token và blacklist token
+- Xác thực Email/Password (+ 2FA khi được bật/bắt buộc)
+- Bảo mật phiên với JWT access/refresh (`type` + `jti`), rotate refresh, revoke khi logout
 - Hỗ trợ quy trình bảo mật nâng cao (OTP email, 2FA, mã khôi phục)
 - Quản lý timeline sự kiện học tập theo user
 
@@ -17,12 +17,11 @@ BCN Profiles được xây dựng theo kiến trúc module của NestJS, tập t
 ### Authentication & Authorization
 
 - Đăng ký, đăng nhập bằng Email/Password
-- Đăng nhập bằng Google OAuth 2.0
-- JWT Access Token + Refresh Token
+- JWT Access Token + Refresh Token (cookie HttpOnly)
 - RBAC theo vai trò (`USER`, `ADMIN`)
 - Quên mật khẩu bằng OTP qua email
 - Đổi email và xác minh email mới bằng OTP
-- 2FA (TOTP + recovery codes)
+- 2FA (TOTP + email OTP + backup codes + recovery có password)
 
 ### User Management
 
@@ -41,7 +40,8 @@ BCN Profiles được xây dựng theo kiến trúc module của NestJS, tập t
 ### Security
 
 - Rate limiting (throttle)
-- Token blacklist khi logout
+- Token revocation (`jti` blacklist) khi logout / refresh rotate
+- Single-use 2FA challenge tokens
 - Validate input với `class-validator`
 - `helmet` cho HTTP security headers
 - Cookie parser và cơ chế bảo vệ endpoint theo guard/decorator
@@ -63,8 +63,8 @@ BCN Profiles được xây dựng theo kiến trúc module của NestJS, tập t
 
 ### Authentication & Security
 
-- `@nestjs/jwt`, `passport`, `passport-jwt`, `passport-local`, `passport-google-oauth20`
-- `bcrypt` để hash password/recovery codes
+- `@nestjs/jwt`, `passport`, `passport-jwt`, `passport-local`
+- `bcrypt` để hash password/recovery codes/OTP
 - `helmet`, `@nestjs/throttler`
 
 ### Validation & Data Handling
@@ -107,20 +107,17 @@ Tạo file `.env` ở root:
 # Database
 DATABASE_URL="postgresql://user:password@host:5432/database"
 
-# JWT
-JWT_SECRET="your-jwt-secret-key"
-JWT_REFRESH_SECRET="your-jwt-refresh-secret-key"
+# JWT (required, strong secret)
+JWT_SECRET="your-strong-jwt-secret"
+
+# Optional: dedicated key for encrypting TOTP secrets at rest
+# TOTP_ENCRYPTION_KEY="your-totp-encryption-key"
 
 # Email (OTP)
 EMAIL_HOST="smtp.gmail.com"
 EMAIL_PORT=587
 EMAIL_USER="your-email@gmail.com"
 EMAIL_PASSWORD="your-app-password"
-
-# Google OAuth
-GOOGLE_CLIENT_ID="your-google-client-id"
-GOOGLE_CLIENT_SECRET="your-google-client-secret"
-GOOGLE_CALLBACK_URL="http://localhost:3000/auth/google/callback"
 
 # App
 NODE_ENV="development"
@@ -180,4 +177,5 @@ npm run start:prod
 
 - Luôn chạy migration bằng `migrate deploy` trên môi trường production.
 - Hạn chế dùng `prisma db push` trên production để tránh lệch lịch sử migration.
-- Đảm bảo secrets (`JWT_SECRET`, mail credentials, OAuth secrets) được quản lý qua biến môi trường an toàn.
+- Đảm bảo secrets (`JWT_SECRET`, optional `TOTP_ENCRYPTION_KEY`, mail credentials) được quản lý qua biến môi trường an toàn.
+- FE integration: xem checklist + pseudo-code trong [API_DOCS.md](./API_DOCS.md) (Cookies & Tokens).

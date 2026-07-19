@@ -3,11 +3,10 @@ import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 import { RegisterDto } from './dto/register.dto';
-import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { EmailService } from './services/email.service';
-import { randomUUID } from 'crypto';
+import { randomInt, randomUUID } from 'crypto';
 import { RequestEmailChangeDto } from './dto/request-email-change.dto';
 import { ConfirmEmailChangeDto } from './dto/confirm-email-change.dto';
 import { TwoFactorAuthService } from './services/two-factor-auth.service';
@@ -15,6 +14,7 @@ import {
   AuthSessionCacheService,
   CachedAuthUser,
 } from './services/auth-session-cache.service';
+import { TokenRevocationService } from './services/token-revocation.service';
 
 type TokenUser = {
   id: string;
@@ -27,6 +27,20 @@ type TokenUser = {
   updatedAt?: Date;
 };
 
+type JwtTokenPayload = {
+  sub: string;
+  email: string;
+  role: string;
+  fullName: string | null;
+  avatar: string | null;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+  type: 'access' | 'refresh';
+  jti: string;
+  exp?: number;
+};
+
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
@@ -37,6 +51,7 @@ export class AuthService {
     private emailService: EmailService,
     private twoFactorAuthService: TwoFactorAuthService,
     private readonly sessionCache: AuthSessionCacheService,
+    private readonly tokenRevocation: TokenRevocationService,
   ) {}
 
   async validateUser(email: string, password: string): Promise<any> {
@@ -123,13 +138,14 @@ export class AuthService {
   }
 
   async login(user: any) {
-    // Check 2FA status
     const twoFactorEnabled = user.twoFactorEnabled || false;
     const twoFactorRequired = user.twoFactorRequired || false;
 
-    // If 2FA is required but not enabled - force user to setup 2FA
     if (twoFactorRequired && !twoFactorEnabled) {
-      const setupToken = this.twoFactorAuthService.generateSetupToken(user.id, user.email);
+      const setupToken = await this.twoFactorAuthService.generateSetupToken(
+        user.id,
+        user.email,
+      );
       return {
         requiresTwoFactorSetup: true,
         setupToken,
@@ -137,9 +153,11 @@ export class AuthService {
       };
     }
 
-    // If 2FA is enabled - require verification
     if (twoFactorEnabled) {
-      const verificationToken = this.twoFactorAuthService.generateVerificationToken(user.id, user.email);
+      const verificationToken = await this.twoFactorAuthService.generateVerificationToken(
+        user.id,
+        user.email,
+      );
       return {
         requiresTwoFactorVerification: true,
         verificationToken,
@@ -147,7 +165,6 @@ export class AuthService {
       };
     }
 
-    // 2FA is optional and not enabled - allow login without 2FA
     return {
       requiresTwoFactorSetup: false,
       requiresTwoFactorVerification: false,
@@ -180,6 +197,7 @@ export class AuthService {
     if (!user) {
       throw new UnauthorizedException('Người dùng không tồn tại');
     }
+    this.assertUserActive(user.status);
 
     const tokens = this.issueTokenPair(user);
 
@@ -197,10 +215,16 @@ export class AuthService {
 
   async refreshTokens(refreshToken: string) {
     try {
-      // Xác thực refresh token
-      const payload = this.jwtService.verify(refreshToken);
-      
-      // Kiểm tra user còn tồn tại
+      const payload = this.jwtService.verify(refreshToken) as Partial<JwtTokenPayload>;
+
+      if (payload.type !== 'refresh' || !payload.sub || !payload.jti) {
+        throw new UnauthorizedException('Refresh token không hợp lệ');
+      }
+
+      if (await this.tokenRevocation.isRevoked(payload.jti)) {
+        throw new UnauthorizedException('Refresh token đã bị thu hồi');
+      }
+
       const user = await this.prisma.user.findUnique({
         where: { id: payload.sub },
         select: {
@@ -218,13 +242,13 @@ export class AuthService {
       if (!user) {
         throw new UnauthorizedException('Người dùng không tồn tại');
       }
+      this.assertUserActive(user.status);
 
-      if (user.status === 'PENDING') {
-        throw new UnauthorizedException('Tài khoản đang chờ admin phê duyệt.');
-      }
-      if (user.status === 'BLOCKED') {
-        throw new UnauthorizedException('Tài khoản đã bị khóa. Vui lòng liên hệ admin.');
-      }
+      // Rotate: revoke current refresh jti before issuing a new pair.
+      const expMs = payload.exp
+        ? payload.exp * 1000
+        : Date.now() + 7 * 24 * 60 * 60 * 1000;
+      await this.tokenRevocation.revoke(payload.jti, new Date(expMs));
 
       const tokens = this.issueTokenPair(user);
 
@@ -233,7 +257,29 @@ export class AuthService {
         user,
       };
     } catch (error) {
+      if (error instanceof UnauthorizedException) throw error;
       throw new UnauthorizedException('Refresh token không hợp lệ');
+    }
+  }
+
+  async revokeTokenPair(accessToken?: string, refreshToken?: string): Promise<void> {
+    await Promise.all([
+      this.revokeIfPresent(accessToken),
+      this.revokeIfPresent(refreshToken),
+    ]);
+  }
+
+  private async revokeIfPresent(token?: string): Promise<void> {
+    if (!token) return;
+    try {
+      const payload = this.jwtService.verify(token, { ignoreExpiration: true }) as Partial<JwtTokenPayload>;
+      if (!payload.jti) return;
+      const expMs = payload.exp
+        ? payload.exp * 1000
+        : Date.now() + 60 * 60 * 1000;
+      await this.tokenRevocation.revoke(payload.jti, new Date(Math.max(expMs, Date.now())));
+    } catch {
+      // Ignore malformed cookies on logout.
     }
   }
 
@@ -359,11 +405,17 @@ export class AuthService {
     return { message: 'Cập nhật email thành công.' };
   }
 
-  /**
-   * Tạo mã OTP ngẫu nhiên 6 chữ số
-   */
   private generateOTP(): string {
-    return Math.floor(100000 + Math.random() * 900000).toString();
+    return randomInt(100000, 1000000).toString();
+  }
+
+  private assertUserActive(status: string): void {
+    if (status === 'PENDING') {
+      throw new UnauthorizedException('Tài khoản đang chờ admin phê duyệt.');
+    }
+    if (status === 'BLOCKED') {
+      throw new UnauthorizedException('Tài khoản đã bị khóa. Vui lòng liên hệ admin.');
+    }
   }
 
   /**
@@ -400,23 +452,21 @@ export class AuthService {
       },
     });
 
-    // Tạo OTP mới
     const otp = this.generateOTP();
     const expiresAt = new Date();
-    expiresAt.setMinutes(expiresAt.getMinutes() + 15); // OTP hết hạn sau 15 phút
+    expiresAt.setMinutes(expiresAt.getMinutes() + 15);
+    const otpHash = await bcrypt.hash(otp, 10);
 
-    // Lưu OTP vào database
     await this.prisma.passwordReset.create({
       data: {
         id: randomUUID(),
         email,
-        otp,
+        otp: otpHash,
         expiresAt,
         isUsed: false,
       },
     });
 
-    // Dispatch mail sending in background to keep API response time low.
     void this.emailService.sendResetPasswordEmail(email, otp, user.fullName || undefined).catch((error) => {
       this.logger.error('Failed to send reset-password OTP in background', error instanceof Error ? error.stack : undefined);
     });
@@ -430,28 +480,30 @@ export class AuthService {
   async resetPassword(resetPasswordDto: ResetPasswordDto) {
     const { email, otp, newPassword } = resetPasswordDto;
 
-    // Tìm OTP trong database
-    const passwordReset = await this.prisma.passwordReset.findFirst({
+    const candidates = await this.prisma.passwordReset.findMany({
       where: {
         email,
-        otp,
         isUsed: false,
+        expiresAt: { gt: new Date() },
       },
-      orderBy: {
-        createdAt: 'desc',
-      },
+      orderBy: { createdAt: 'desc' },
+      take: 5,
     });
+
+    let passwordReset = null as (typeof candidates)[number] | null;
+    for (const row of candidates) {
+      const matched =
+        row.otp === otp || (await bcrypt.compare(otp, row.otp));
+      if (matched) {
+        passwordReset = row;
+        break;
+      }
+    }
 
     if (!passwordReset) {
       throw new BadRequestException('Mã OTP không hợp lệ hoặc đã được sử dụng');
     }
 
-    // Kiểm tra OTP có hết hạn chưa
-    if (new Date() > passwordReset.expiresAt) {
-      throw new BadRequestException('Mã OTP đã hết hạn. Vui lòng yêu cầu mã mới.');
-    }
-
-    // Kiểm tra user có tồn tại không
     const user = await this.prisma.user.findUnique({
       where: { email },
     });
@@ -460,99 +512,26 @@ export class AuthService {
       throw new NotFoundException('Người dùng không tồn tại');
     }
 
-    // Hash mật khẩu mới
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
-    // Cập nhật mật khẩu mới và đánh dấu OTP đã sử dụng
-    await this.prisma.$transaction([
-      // Cập nhật mật khẩu mới
-      this.prisma.user.update({
-        where: { email },
-        data: {
-          password: hashedPassword,
-          updatedAt: new Date(),
-        },
-      }),
-      // Đánh dấu OTP đã sử dụng
-      this.prisma.passwordReset.update({
-        where: { id: passwordReset.id },
-        data: { isUsed: true },
-      }),
-    ]);
+    const marked = await this.prisma.passwordReset.updateMany({
+      where: { id: passwordReset.id, isUsed: false },
+      data: { isUsed: true },
+    });
+    if (marked.count !== 1) {
+      throw new BadRequestException('Mã OTP không hợp lệ hoặc đã được sử dụng');
+    }
 
-    return {
-      message: 'Đặt lại mật khẩu thành công. Bạn có thể đăng nhập với mật khẩu mới.',
-    };
-  }
-
-  /**
-   * Xử lý đăng nhập bằng Google OAuth
-   */
-  async googleLogin(googleUser: any) {
-    const { googleId, email, fullName, avatar } = googleUser;
-
-    // Tìm user theo email
-    let user = await this.prisma.user.findUnique({
+    await this.prisma.user.update({
       where: { email },
-      select: {
-        id: true,
-        email: true,
-        fullName: true,
-        avatar: true,
-        role: true,
-        status: true,
-        createdAt: true,
-        updatedAt: true,
+      data: {
+        password: hashedPassword,
+        updatedAt: new Date(),
       },
     });
 
-    // Nếu user chưa tồn tại, tạo mới với status PENDING
-    if (!user) {
-      user = await this.prisma.createUserWithUniqueId((id) =>
-        this.prisma.user.create({
-          data: {
-            id,
-            email,
-            fullName,
-            avatar,
-            password: null,
-            status: 'PENDING',
-            updatedAt: new Date(),
-          },
-          select: {
-            id: true,
-            email: true,
-            fullName: true,
-            avatar: true,
-            role: true,
-            status: true,
-            createdAt: true,
-            updatedAt: true,
-          },
-        }),
-      );
-
-      throw new UnauthorizedException('Tài khoản mới đã được tạo và đang chờ admin phê duyệt. Bạn sẽ nhận được email thông báo khi được duyệt.');
-    }
-
-    if (user.status === 'PENDING') {
-      throw new UnauthorizedException('Tài khoản đang chờ admin phê duyệt. Vui lòng chờ thông báo qua email.');
-    }
-    if (user.status === 'BLOCKED') {
-      throw new UnauthorizedException('Tài khoản đã bị khóa. Vui lòng liên hệ admin.');
-    }
-
-    const tokens = this.issueTokenPair(user);
-
     return {
-      ...tokens,
-      user: {
-        id: user.id,
-        email: user.email,
-        fullName: user.fullName,
-        avatar: user.avatar,
-        role: user.role,
-      },
+      message: 'Đặt lại mật khẩu thành công. Bạn có thể đăng nhập với mật khẩu mới.',
     };
   }
 
@@ -563,7 +542,7 @@ export class AuthService {
     const cachedUser = this.toCachedAuthUser(user);
     this.sessionCache.setUser(cachedUser);
 
-    const payload = {
+    const base = {
       sub: user.id,
       email: user.email,
       role: user.role,
@@ -575,8 +554,14 @@ export class AuthService {
     };
 
     return {
-      access_token: this.jwtService.sign(payload, { expiresIn: '60m' }),
-      refresh_token: this.jwtService.sign(payload, { expiresIn: '7d' }),
+      access_token: this.jwtService.sign(
+        { ...base, type: 'access', jti: randomUUID() },
+        { expiresIn: '60m' },
+      ),
+      refresh_token: this.jwtService.sign(
+        { ...base, type: 'refresh', jti: randomUUID() },
+        { expiresIn: '7d' },
+      ),
     };
   }
 

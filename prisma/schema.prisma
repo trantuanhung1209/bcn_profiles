@@ -25,11 +25,27 @@ model PasswordReset {
 
 model TokenBlacklist {
   id        Int      @id @default(autoincrement())
-  token     String   @unique
+  token     String   @unique // JWT jti
   createdAt DateTime @default(now())
   expiresAt DateTime
 
   @@index([expiresAt])
+}
+
+/// Single-use challenge tokens for 2FA setup / verify / recovery.
+model AuthChallenge {
+  id            String    @id // jti
+  userId        String
+  email         String
+  type          String // setup-2fa | verify-2fa | recovery-2fa
+  totpSecretEnc String? // encrypted TOTP secret (setup flow only)
+  expiresAt     DateTime
+  usedAt        DateTime?
+  createdAt     DateTime  @default(now())
+
+  @@index([userId, type])
+  @@index([expiresAt])
+  @@map("auth_challenges")
 }
 
 model User {

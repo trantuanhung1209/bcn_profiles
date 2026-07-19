@@ -9,6 +9,8 @@ A complete 2-Factor Authentication system with:
 - **Optional 2FA** — users can voluntarily enable/disable 2FA when logged in
 - **Configurable 2FA requirement** — admin can set `twoFactorRequired` per user
 
+> **FE contract (updated):** Google OAuth đã bỏ. Challenge tokens (`setupToken` / `verificationToken` / `recoveryToken`) là **single-use**. Setup/enable confirm chỉ cần `{ code }` (secret optional). Recovery reset **bắt buộc** `{ password }`. Chi tiết endpoint: [API_DOCS.md](./API_DOCS.md).
+
 ---
 
 ## 2FA Configuration
@@ -58,20 +60,21 @@ Check twoFactorRequired flag
 #### 2️⃣ 2FA Setup Process (When Required)
 ```
 Step 1: POST /auth/2fa/setup/initiate
-  - Require: setupToken (header), password (body)
-  - Verify password for security
-  - Return: { secret, qrCode, setupToken (new, with secret embedded) }
+  - Require: setupToken from login (header), password (body)
+  - Login setupToken is consumed
+  - Return: { secret, qrCode, setupToken (NEW — FE must replace old token) }
 
 Step 2: Client scans QR code with Authenticator app
   - User's Authenticator app displays time-based codes
 
 Step 3: POST /auth/2fa/setup/confirm
-  - Require: setupToken (header), body: { secret, code }
-  - Verify TOTP code against secret
-  - Generate backup codes server-side
-  - Save TOTP secret + backup codes to database
-  - Return: { backupCodes, user } + set access/refresh cookies
+  - Require: NEW setupToken (header), body: { code }  // secret optional
+  - Verify TOTP against secret bound to setupToken
+  - Consume setupToken (single-use)
+  - Generate backup codes server-side + set cookies
+  - Return: { backupCodes, user }
   ← User is now logged in!
+  ← Show backup codes once, then clear from client state
 ```
 
 #### 3️⃣ Subsequent Logins (2FA Enabled)
@@ -93,26 +96,25 @@ Option A: TOTP from Authenticator App
   POST /auth/2fa/verify/totp
     - Header: Authorization: Bearer <verificationToken>
     - Body: { code: "123456" }
-    - Verify code against stored secret
-    - Return: { accessToken, refreshToken }
+    - On success: HttpOnly cookies set; verificationToken consumed
 
 Option B: Email OTP (if app unavailable)
   POST /auth/2fa/send-email-otp
     - Header: Authorization: Bearer <verificationToken>
+    - Does NOT consume verificationToken
     - Action: Send 6-digit code to email
-    - Return: success message
   
   Then: POST /auth/2fa/verify/email
     - Header: Authorization: Bearer <verificationToken>
     - Body: { code: "789012" }
-    - Return: { accessToken, refreshToken }
+    - On success: cookies set; verificationToken consumed
 
 Option C: Backup Code (emergency)
   POST /auth/2fa/verify/backup-code
     - Header: Authorization: Bearer <verificationToken>
-    - Body: { code: "ABC123" }
-    - Mark code as used
-    - Return: { accessToken, refreshToken }
+    - Body: { code: "ABCD1234" }
+    - Mark backup code used + consume verificationToken
+    - On success: cookies set
 ```
 
 #### 5️⃣ User Self-Service 2FA (Voluntary Enable/Disable)
@@ -124,13 +126,13 @@ User chủ động bật hoặc tắt 2FA khi đang đăng nhập — không c�
 Step 1: POST /auth/2fa/me/enable/initiate
   - Require: access_token (JWT cookie), body: { password }
   - Verify password
-  - Return: { secret, qrCode, setupToken (15 min) }
+  - Return: { secret, qrCode, setupToken (15 min, single-use) }
 
 Step 2: User scans QR with Authenticator app
 
 Step 3: POST /auth/2fa/me/enable/confirm
-  - Require: setupToken (header), body: { secret, code }
-  - Verify TOTP code
+  - Require: setupToken (header), body: { code }  // secret optional
+  - Verify TOTP + consume setupToken
   - Save to DB + generate backup codes
   - Return: { backupCodes: [...10 codes...] }
 ```
@@ -153,18 +155,21 @@ GET /auth/2fa/me/status
 
 ---
 
-#### 6️⃣ Lost Smart Phone Recovery```
+#### 6️⃣ Lost Smart Phone Recovery
+```
 POST /auth/2fa/recovery/request
   - Body: { email: "user@example.com" }
-  - Action: Send recovery OTP to email
+  - Always generic success response
+  - OTP only sent if user is ACTIVE and twoFactorEnabled=true
   
 POST /auth/2fa/recovery/verify-email
   - Body: { email, recoveryOtp: "654321" }
-  - Return: { recoveryToken }
+  - Return: { recoveryToken } (30 min, single-use)
 
 POST /auth/2fa/recovery/reset
   - Header: Authorization: Bearer <recoveryToken>
-  - Action: Disable 2FA for user
+  - Body: { password }   // REQUIRED
+  - Action: Disable 2FA + consume recoveryToken
   - User must setup 2FA again on next login (if required)
 ```
 
@@ -218,10 +223,11 @@ Authorization: Bearer <setupToken>
 **Body**:
 ```json
 {
-  "secret": "ABCD1234EFGH5678IJKL9012",
   "code": "123456"
 }
 ```
+
+> `secret` là optional (legacy). Server dùng secret gắn với `setupToken`.
 
 **Response**:
 ```json
@@ -235,7 +241,7 @@ Authorization: Bearer <setupToken>
 }
 ```
 
-**Note**: Backup codes được generate server-side tại bước này. Cookie `access_token` + `refresh_token` được set — user đã đăng nhập.
+**Note**: Backup codes được generate server-side tại bước này. Cookie `access_token` + `refresh_token` được set — user đã đăng nhập. `setupToken` bị consume.
 
 ---
 
@@ -395,7 +401,7 @@ Authorization: Bearer <verificationToken>
 #### POST `/auth/2fa/me/enable/confirm`
 **Public endpoint** — xác thực qua `setupToken` trong header
 
-**Rate limit**: 5 requests / phút
+**Rate limit**: 10 requests / phút
 
 **Header**:
 ```
@@ -405,10 +411,11 @@ Authorization: Bearer <setupToken>
 **Body**:
 ```json
 {
-  "secret": "BASE32SECRET...",
   "code": "123456"
 }
 ```
+
+> `secret` optional (legacy).
 
 **Response**:
 ```json
@@ -462,7 +469,7 @@ Authorization: Bearer <setupToken>
 ### Recovery Endpoints
 
 #### POST `/auth/2fa/recovery/request`
-**Public endpoint - Rate limited**
+**Public endpoint - Rate limited (3 / 15 phút)**
 
 **Body**:
 ```json
@@ -475,7 +482,7 @@ Authorization: Bearer <setupToken>
 ```json
 {
   "success": true,
-  "message": "Nếu email tồn tại, bạn sẽ nhận được mã khôi phục...",
+  "message": "Nếu email tồn tại và đã bật 2FA, bạn sẽ nhận được mã khôi phục.",
   "nextStep": "Sử dụng mã để xác nhận yêu cầu khôi phục"
 }
 ```
@@ -498,15 +505,27 @@ Authorization: Bearer <setupToken>
 {
   "success": true,
   "recoveryToken": "eyJhbGciOiJIUzI1NiIs...",
-  "message": "Xác minh email thành công",
-  "nextStep": "Gọi endpoint reset 2FA recovery với recovery token này"
+  "message": "Xác minh email thành công. Nhập mật khẩu tài khoản để reset 2FA.",
+  "nextStep": "Gọi endpoint reset 2FA recovery với recovery token + password"
 }
 ```
 
 ---
 
 #### POST `/auth/2fa/recovery/reset`
-**Requires**: recoveryToken (from recovery flow)
+**Requires**: recoveryToken (header) + account password (body)
+
+**Header**:
+```
+Authorization: Bearer <recoveryToken>
+```
+
+**Body**:
+```json
+{
+  "password": "user_password"
+}
+```
 
 **Response**:
 ```json

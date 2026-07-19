@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, Length } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, Length } from 'class-validator';
 
 export class InitiateEnable2FADto {
   @IsString()
@@ -7,10 +7,10 @@ export class InitiateEnable2FADto {
 }
 
 export class ConfirmEnable2FADto {
-  /** TOTP secret từ initiate step (không bắt buộc nếu setupToken đã chứa secret) */
+  /** Optional legacy field — server prefers secret bound to setupToken. */
+  @IsOptional()
   @IsString()
-  @IsNotEmpty({ message: 'Secret không được để trống' })
-  secret: string;
+  secret?: string;
 
   @IsString()
   @Length(6, 6, { message: 'Mã TOTP phải đúng 6 chữ số' })

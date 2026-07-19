@@ -1,15 +1,11 @@
 import { Injectable, CanActivate, ExecutionContext, UnauthorizedException } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
-import { ConfigService } from '@nestjs/config';
+import { AuthChallengeService } from '../services/auth-challenge.service';
 
 @Injectable()
 export class TwoFactorVerificationGuard implements CanActivate {
-  constructor(
-    private jwtService: JwtService,
-    private configService: ConfigService,
-  ) {}
+  constructor(private readonly challengeService: AuthChallengeService) {}
 
-  canActivate(context: ExecutionContext): boolean {
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
     const authHeader = request.headers.authorization;
 
@@ -18,26 +14,17 @@ export class TwoFactorVerificationGuard implements CanActivate {
     }
 
     const token = authHeader.split(' ')[1];
-
-    try {
-      const secret = this.configService.get<string>('JWT_SECRET') || 'your-secret-key';
-      const payload = this.jwtService.verify(token, {
-        secret,
-      });
-
-      if (payload.type !== 'verify-2fa') {
-        throw new UnauthorizedException('Invalid token type');
-      }
-
-      // Attach user info to request
-      request.user = {
-        userId: payload.sub,
-        email: payload.email,
-      };
-
-      return true;
-    } catch (error) {
-      throw new UnauthorizedException('Invalid or expired verification token');
+    if (!token) {
+      throw new UnauthorizedException('Verification token is missing');
     }
+
+    const challenge = await this.challengeService.validate(token, 'verify-2fa');
+    request.user = {
+      userId: challenge.userId,
+      email: challenge.email,
+      jti: challenge.jti,
+    };
+    request.challengeToken = token;
+    return true;
   }
 }

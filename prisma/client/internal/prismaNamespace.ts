@@ -386,6 +386,7 @@ type FieldRefInputType<Model, FieldType> = Model extends never ? never : FieldRe
 export const ModelName = {
   PasswordReset: 'PasswordReset',
   TokenBlacklist: 'TokenBlacklist',
+  AuthChallenge: 'AuthChallenge',
   User: 'User',
   TwoFactorRecoveryCode: 'TwoFactorRecoveryCode',
   TimelineEvent: 'TimelineEvent'
@@ -404,7 +405,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "passwordReset" | "tokenBlacklist" | "user" | "twoFactorRecoveryCode" | "timelineEvent"
+    modelProps: "passwordReset" | "tokenBlacklist" | "authChallenge" | "user" | "twoFactorRecoveryCode" | "timelineEvent"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -553,6 +554,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.TokenBlacklistCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.TokenBlacklistCountAggregateOutputType> | number
+        }
+      }
+    }
+    AuthChallenge: {
+      payload: Prisma.$AuthChallengePayload<ExtArgs>
+      fields: Prisma.AuthChallengeFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.AuthChallengeFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AuthChallengePayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.AuthChallengeFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AuthChallengePayload>
+        }
+        findFirst: {
+          args: Prisma.AuthChallengeFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AuthChallengePayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.AuthChallengeFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AuthChallengePayload>
+        }
+        findMany: {
+          args: Prisma.AuthChallengeFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AuthChallengePayload>[]
+        }
+        create: {
+          args: Prisma.AuthChallengeCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AuthChallengePayload>
+        }
+        createMany: {
+          args: Prisma.AuthChallengeCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.AuthChallengeCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AuthChallengePayload>[]
+        }
+        delete: {
+          args: Prisma.AuthChallengeDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AuthChallengePayload>
+        }
+        update: {
+          args: Prisma.AuthChallengeUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AuthChallengePayload>
+        }
+        deleteMany: {
+          args: Prisma.AuthChallengeDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.AuthChallengeUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.AuthChallengeUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AuthChallengePayload>[]
+        }
+        upsert: {
+          args: Prisma.AuthChallengeUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AuthChallengePayload>
+        }
+        aggregate: {
+          args: Prisma.AuthChallengeAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateAuthChallenge>
+        }
+        groupBy: {
+          args: Prisma.AuthChallengeGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AuthChallengeGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.AuthChallengeCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AuthChallengeCountAggregateOutputType> | number
         }
       }
     }
@@ -847,6 +922,20 @@ export const TokenBlacklistScalarFieldEnum = {
 export type TokenBlacklistScalarFieldEnum = (typeof TokenBlacklistScalarFieldEnum)[keyof typeof TokenBlacklistScalarFieldEnum]
 
 
+export const AuthChallengeScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  email: 'email',
+  type: 'type',
+  totpSecretEnc: 'totpSecretEnc',
+  expiresAt: 'expiresAt',
+  usedAt: 'usedAt',
+  createdAt: 'createdAt'
+} as const
+
+export type AuthChallengeScalarFieldEnum = (typeof AuthChallengeScalarFieldEnum)[keyof typeof AuthChallengeScalarFieldEnum]
+
+
 export const UserScalarFieldEnum = {
   id: 'id',
   email: 'email',
@@ -917,6 +1006,14 @@ export const QueryMode = {
 export type QueryMode = (typeof QueryMode)[keyof typeof QueryMode]
 
 
+export const NullsOrder = {
+  first: 'first',
+  last: 'last'
+} as const
+
+export type NullsOrder = (typeof NullsOrder)[keyof typeof NullsOrder]
+
+
 export const JsonNullValueFilter = {
   DbNull: DbNull,
   JsonNull: JsonNull,
@@ -924,14 +1021,6 @@ export const JsonNullValueFilter = {
 } as const
 
 export type JsonNullValueFilter = (typeof JsonNullValueFilter)[keyof typeof JsonNullValueFilter]
-
-
-export const NullsOrder = {
-  first: 'first',
-  last: 'last'
-} as const
-
-export type NullsOrder = (typeof NullsOrder)[keyof typeof NullsOrder]
 
 
 
@@ -1155,6 +1244,7 @@ export type PrismaClientOptions = ({
 export type GlobalOmitConfig = {
   passwordReset?: Prisma.PasswordResetOmit
   tokenBlacklist?: Prisma.TokenBlacklistOmit
+  authChallenge?: Prisma.AuthChallengeOmit
   user?: Prisma.UserOmit
   twoFactorRecoveryCode?: Prisma.TwoFactorRecoveryCodeOmit
   timelineEvent?: Prisma.TimelineEventOmit

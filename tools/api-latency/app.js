@@ -173,15 +173,13 @@ async function measureRequest(endpoint) {
     });
   }
 
-  // Unique query marker helps match Resource Timing entry.
-  const mark = `lat_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-  const measuredUrl = endpoint.method === "GET" ? `${url}${url.includes("?") ? "&" : "?"}_=${mark}` : url;
-
+  // Do not append cache-buster query params — ValidationPipe forbidNonWhitelisted
+  // rejects unknown keys like `_` on DTO-validated query endpoints.
   const t0 = performance.now();
   let response;
   let errorMessage = "";
   try {
-    response = await fetch(measuredUrl, init);
+    response = await fetch(url, init);
   } catch (error) {
     errorMessage = error instanceof Error ? error.message : String(error);
   }
@@ -198,7 +196,13 @@ async function measureRequest(endpoint) {
 
   try {
     const entries = performance.getEntriesByType("resource");
-    const match = [...entries].reverse().find((entry) => entry.name.includes(mark) || entry.name === url);
+    const match = [...entries]
+      .reverse()
+      .find(
+        (entry) =>
+          entry.startTime >= t0 - 1 &&
+          (entry.name === url || entry.name.startsWith(`${url}?`) || entry.name.startsWith(url)),
+      );
     if (match && match.responseStart > 0) {
       ttfb = match.responseStart - match.requestStart;
       if (match.transferSize > 0) transferSize = match.transferSize;

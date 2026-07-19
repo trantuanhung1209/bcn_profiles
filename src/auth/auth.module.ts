@@ -10,7 +10,6 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { LocalStrategy } from './strategies/local.strategy';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { GoogleStrategy } from './strategies/google.strategy';
-import { TokenBlacklistService } from './services/token-blacklist.service';
 import { AuthSessionCacheService } from './services/auth-session-cache.service';
 import { EmailService } from './services/email.service';
 import { MailQueueService } from './services/mail-queue.service';
@@ -41,7 +40,6 @@ import { TwoFactorRecoveryGuard } from './guards/two-factor-recovery.guard';
     JwtStrategy,
     GoogleStrategy,
     AuthSessionCacheService,
-    TokenBlacklistService,
     MailQueueService,
     EmailService,
     TwoFactorAuthService,
@@ -52,7 +50,6 @@ import { TwoFactorRecoveryGuard } from './guards/two-factor-recovery.guard';
   exports: [
     AuthService,
     AuthSessionCacheService,
-    TokenBlacklistService,
     TwoFactorAuthService,
     EmailService,
     MailQueueService,

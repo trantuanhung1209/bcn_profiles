@@ -22,7 +22,6 @@ import { RegisterDto } from './dto/register.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { Public } from './decorators/public.decorator';
-import { TokenBlacklistService } from './services/token-blacklist.service';
 import { EmailService } from './services/email.service';
 import { Throttle, SkipThrottle } from '@nestjs/throttler';
 import { RequestEmailChangeDto } from './dto/request-email-change.dto';
@@ -82,7 +81,6 @@ export class AuthController {
 
   constructor(
     private readonly authService: AuthService,
-    private readonly tokenBlacklistService: TokenBlacklistService,
     private readonly twoFactorAuthService: TwoFactorAuthService,
     private readonly emailService: EmailService,
     private readonly prisma: PrismaService,
@@ -157,15 +155,8 @@ export class AuthController {
   @Post('logout')
   @HttpCode(HttpStatus.OK)
   async logout(@Res({ passthrough: true }) response: Response) {
-    // Lấy access token từ cookie để thêm vào blacklist
-    const accessToken = response.req.cookies?.access_token;
-    
-    if (accessToken) {
-      // Thêm token vào blacklist, tự động xóa sau 24h
-      await this.tokenBlacklistService.addToBlacklist(accessToken, 24);
-    }
-
-    // Xóa cả 2 cookies với cùng options như lúc set
+    // Stateless JWT: logout only clears cookies. Token remains cryptographically
+    // valid until exp; clients must drop cookies and stop sending the token.
     response.clearCookie('access_token', this.baseCookieOptions);
     response.clearCookie('refresh_token', this.baseCookieOptions);
 

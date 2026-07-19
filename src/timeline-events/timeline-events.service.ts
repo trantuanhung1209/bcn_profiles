@@ -6,13 +6,17 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateTimelineEventDto } from './dto/create-timeline-event.dto';
 import { UpdateTimelineEventDto } from './dto/update-timeline-event.dto';
+import { UsersListCacheService } from '../users/users-list-cache.service';
 
 @Injectable()
 export class TimelineEventsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private readonly usersListCache: UsersListCacheService,
+  ) {}
 
   async create(userId: string, createDto: CreateTimelineEventDto) {
-    return this.prisma.timelineEvent.create({
+    const created = await this.prisma.timelineEvent.create({
       data: {
         userUuid: userId,
         eventType: createDto.eventType,
@@ -20,6 +24,8 @@ export class TimelineEventsService {
         metadata: createDto.metadata,
       },
     });
+    this.usersListCache.invalidateAll();
+    return created;
   }
 
   async findAllByUser(userId: string, page: number = 1, limit: number = 20) {
@@ -58,17 +64,21 @@ export class TimelineEventsService {
       );
     }
 
-    return this.prisma.timelineEvent.update({
+    const updated = await this.prisma.timelineEvent.update({
       where: { id },
       data: updateDto,
     });
+    this.usersListCache.invalidateAll();
+    return updated;
   }
 
   async remove(id: number) {
     const event = await this.findOne(id);
-    
-    return this.prisma.timelineEvent.delete({
+
+    const removed = await this.prisma.timelineEvent.delete({
       where: { id },
     });
+    this.usersListCache.invalidateAll();
+    return removed;
   }
 }

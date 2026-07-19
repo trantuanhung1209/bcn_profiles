@@ -8,7 +8,7 @@ import {
 import { Request, Response } from 'express';
 import { WINSTON_MODULE_PROVIDER } from 'nest-winston';
 import { Observable, throwError } from 'rxjs';
-import { catchError, tap } from 'rxjs/operators';
+import { catchError } from 'rxjs/operators';
 import type { Logger } from 'winston';
 
 type RequestUser = {
@@ -39,14 +39,31 @@ export class RequestLoggingInterceptor implements NestInterceptor {
     const startedAt = Date.now();
     const method = request.method;
     const url = request.originalUrl ?? request.url;
+    let logged = false;
+
+    const logOnce = (error?: unknown) => {
+      if (logged) {
+        return;
+      }
+      logged = true;
+
+      const status = error
+        ? this.extractStatusCode(error, response.statusCode)
+        : response.statusCode;
+      this.logRequest(request, method, url, status, Date.now() - startedAt, error);
+    };
+
+    // Log when the response has actually been sent to the client.
+    response.once('finish', () => logOnce());
+    response.once('close', () => {
+      if (!response.writableEnded) {
+        logOnce();
+      }
+    });
 
     return next.handle().pipe(
-      tap(() => {
-        this.logRequest(request, method, url, response.statusCode, Date.now() - startedAt);
-      }),
       catchError((error: unknown) => {
-        const status = this.extractStatusCode(error, response.statusCode);
-        this.logRequest(request, method, url, status, Date.now() - startedAt, error);
+        // Exception filters still write a response; 'finish'/'close' log duration.
         return throwError(() => error);
       }),
     );
@@ -61,7 +78,10 @@ export class RequestLoggingInterceptor implements NestInterceptor {
     error?: unknown,
   ): void {
     const level = status >= 500 ? 'error' : status >= 400 ? 'warn' : 'info';
-    const message = error instanceof Error ? error.message : 'request_completed';
+    const message =
+      error instanceof Error
+        ? `${method} ${url} ${status} ${durationMs}ms - ${error.message}`
+        : `${method} ${url} ${status} ${durationMs}ms`;
 
     this.logger.log(level, message, {
       user_id: this.extractUserId(request.user),
@@ -72,6 +92,7 @@ export class RequestLoggingInterceptor implements NestInterceptor {
       statusCode: status,
       ip: this.extractClientIp(request),
       duration_ms: durationMs,
+      response_time_ms: durationMs,
     });
   }
 

@@ -33,6 +33,7 @@ async function bootstrap() {
     origin: isProduction
       ? [
           /^https:\/\/[^.]+\.uside\.studio$/,
+          /^https:\/\/[^.]+\.uside\.id\.vn$/,
           /^https:\/\/.+\.vercel\.app$/,
           'https://profiles-uside-studio.vercel.app',
           'https://quizzes-uside-studio.vercel.app',

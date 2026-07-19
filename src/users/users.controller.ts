@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, ForbiddenException, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, ForbiddenException, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { UsersService } from './users.service';
 import type { SortableUserFields, SortOrder } from './users.service';
 import { QueryUsersDto } from './dto/query-users.dto';
@@ -7,6 +7,7 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Role } from '../auth/enums/role.enum';
 import { User } from '../auth/decorators/user.decorator';
+
 @Controller('users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
@@ -69,6 +70,34 @@ export class UsersController {
     };
   }
 
+  // Must be registered before parameterized ":id" routes.
+  @Get('me/profile')
+  async getMyProfile(@User() user: any) {
+    return {
+      user: user,
+    };
+  }
+
+  @Patch('me')
+  @Roles(Role.USER, Role.ADMIN)
+  async updateUser(
+    @Body() updateData: UpdateUserDto,
+    @User() currentUser: any,
+  ) {
+    const updatedUser = await this.usersService.updateUser(currentUser.id, updateData);
+    return {
+      users: updatedUser,
+    };
+  }
+
+  @Get(':id/profile')
+  async getUserPublicProfile(@Param('id') id: string) {
+    const user = await this.usersService.getPublicProfile(id);
+    return {
+      user: user,
+    };
+  }
+
   @Get(':id')
   @Roles(Role.ADMIN)
   async findOne(@Param('id') id: string) {
@@ -127,35 +156,6 @@ export class UsersController {
     await this.usersService.deleteUser(id);
     return {
       message: 'User đã được xóa',
-    };
-  }
-
-  @Patch('me')
-  @Roles(Role.USER, Role.ADMIN)
-  async updateUser(
-    @Body() updateData: UpdateUserDto,
-    @User() currentUser: any,
-  ) {
-    const updatedUser = await this.usersService.updateUser(currentUser.id, updateData);
-    return {
-      users: updatedUser,
-    };
-  }
-
-  // User xem profile công khai của user khác
-  @Get(':id/profile')
-  async getUserPublicProfile(@Param('id') id: string) {
-    const user = await this.usersService.getPublicProfile(id);
-    return {
-      user: user,
-    };
-  }
-
-  // Ví dụ: Route cho user xem thông tin của chính họ
-  @Get('me/profile')
-  async getMyProfile(@User() user: any) {
-    return {
-      user: user,
     };
   }
 }

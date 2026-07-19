@@ -1,16 +1,28 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { AuthSessionCacheService } from './auth-session-cache.service';
 
 @Injectable()
-export class TokenBlacklistService {
+export class TokenBlacklistService implements OnModuleInit {
   private readonly logger = new Logger(TokenBlacklistService.name);
+
+  /**
+   * When true (default), unknown tokens are treated as not-blacklisted without a DB
+   * round-trip. Persisted blacklist rows are loaded on boot; logout still writes DB
+   * + memory so the current process stays correct immediately.
+   */
+  private readonly trustMemoryMisses =
+    (process.env.AUTH_BLACKLIST_TRUST_MEMORY ?? 'true').toLowerCase() !== 'false';
 
   constructor(
     private prisma: PrismaService,
     private readonly sessionCache: AuthSessionCacheService,
   ) {}
+
+  async onModuleInit(): Promise<void> {
+    await this.preloadActiveBlacklist();
+  }
 
   /**
    * Thêm token vào blacklist
@@ -46,6 +58,12 @@ export class TokenBlacklistService {
       return cached;
     }
 
+    if (this.trustMemoryMisses) {
+      // Fast path for first request after login: avoid DigitalOcean RTT.
+      this.sessionCache.markNotBlacklisted(token);
+      return false;
+    }
+
     const blacklistedToken = await this.prisma.tokenBlacklist.findUnique({
       where: { token },
       select: { expiresAt: true },
@@ -67,6 +85,30 @@ export class TokenBlacklistService {
     return false;
   }
 
+  async preloadActiveBlacklist(): Promise<void> {
+    try {
+      const now = new Date();
+      const rows = await this.prisma.tokenBlacklist.findMany({
+        where: { expiresAt: { gt: now } },
+        select: { token: true, expiresAt: true },
+      });
+
+      for (const row of rows) {
+        this.sessionCache.markBlacklisted(
+          row.token,
+          Math.max(row.expiresAt.getTime() - Date.now(), 1_000),
+        );
+      }
+
+      this.logger.log(`Preloaded ${rows.length} active blacklist token(s) into memory`);
+    } catch (error) {
+      this.logger.error(
+        'Failed to preload token blacklist',
+        error instanceof Error ? error.stack : undefined,
+      );
+    }
+  }
+
   /**
    * Xóa các token đã hết hạn khỏi blacklist
    * Chạy tự động mỗi 1 giờ
@@ -81,8 +123,8 @@ export class TokenBlacklistService {
       },
     });
 
-    // Drop stale positive entries; misses will repopulate naturally.
     this.sessionCache.clearBlacklist();
+    await this.preloadActiveBlacklist();
     this.logger.log(`Cleaned up ${result.count} expired tokens from blacklist`);
   }
 
@@ -99,6 +141,7 @@ export class TokenBlacklistService {
     });
 
     this.sessionCache.clearBlacklist();
+    await this.preloadActiveBlacklist();
     return result.count;
   }
 }

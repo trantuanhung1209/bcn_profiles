@@ -1,10 +1,12 @@
-import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaPg } from '@prisma/adapter-pg';
-import { Pool } from 'pg';
+import { Pool, PoolClient } from 'pg';
 import { PrismaClient } from 'prisma/client/client';
 
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
+  private readonly logger = new Logger(PrismaService.name);
   private readonly pool: Pool;
 
   constructor() {
@@ -24,11 +26,45 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
 
   async onModuleInit() {
     await this.$connect();
+    await this.warmPool();
   }
 
   async onModuleDestroy() {
     await this.$disconnect();
     await this.pool.end();
+  }
+
+  /** Keep remote connections alive so the next request avoids cold TCP/auth. */
+  @Cron(CronExpression.EVERY_30_SECONDS)
+  async keepPoolWarm(): Promise<void> {
+    try {
+      await this.$queryRaw`SELECT 1`;
+    } catch (error) {
+      this.logger.warn(
+        `Pool keepalive failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  private async warmPool(): Promise<void> {
+    const min = Math.max(1, Number(process.env.DB_POOL_MIN ?? 2));
+    const clients: PoolClient[] = [];
+
+    try {
+      for (let i = 0; i < min; i++) {
+        clients.push(await this.pool.connect());
+      }
+      await Promise.all(clients.map((client) => client.query('SELECT 1')));
+      this.logger.log(`Warmed pg pool with ${clients.length} connection(s)`);
+    } catch (error) {
+      this.logger.warn(
+        `Failed to warm pg pool: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    } finally {
+      for (const client of clients) {
+        client.release();
+      }
+    }
   }
 
   generateUserId(): string {

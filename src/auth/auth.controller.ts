@@ -143,8 +143,9 @@ export class AuthController {
   }
 
   @Get('profile')
-  async getProfile(@User('id') ID: string) {
-    return this.authService.getProfile(ID);
+  async getProfile(@User() user: any) {
+    // User already resolved by JwtStrategy (JWT claims / cache) — avoid an extra DB round-trip.
+    return user;
   }
 
   @Get('me')

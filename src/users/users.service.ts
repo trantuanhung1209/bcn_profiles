@@ -337,6 +337,7 @@ export class UsersService {
 
     await this.prisma.user.delete({ where: { id } });
     this.sessionCache.invalidateUser(id);
+    this.sessionCache.setStatusOverride(id, 'BLOCKED');
 
     void this.emailService.sendRejectionEmail(user.email, user.fullName || undefined).catch((error) => {
       this.logger.error('Failed to send rejection email in background', error instanceof Error ? error.stack : undefined);
@@ -370,6 +371,7 @@ export class UsersService {
     });
 
     this.sessionCache.invalidateUser(id);
+    this.sessionCache.setStatusOverride(id, 'ACTIVE');
 
     void this.emailService.sendApprovalEmail(user.email, user.fullName || undefined).catch((error) => {
       // Không rollback nếu gửi email lỗi — tài khoản vẫn được duyệt
@@ -406,6 +408,7 @@ export class UsersService {
     });
 
     this.sessionCache.invalidateUser(id);
+    this.sessionCache.setStatusOverride(id, 'BLOCKED');
     return updatedUser;
   }
 
@@ -436,6 +439,7 @@ export class UsersService {
     });
 
     this.sessionCache.invalidateUser(id);
+    this.sessionCache.setStatusOverride(id, 'ACTIVE');
     return updatedUser;
   }
 

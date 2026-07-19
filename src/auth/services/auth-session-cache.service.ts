@@ -14,8 +14,14 @@ export type CachedAuthUser = {
 
 @Injectable()
 export class AuthSessionCacheService {
-  /** Status/role can change; keep short so blocks propagate quickly. */
+  /** Status/role can change; keep short so profile edits refresh reasonably fast. */
   private readonly userCache = new TtlCache<CachedAuthUser>(30_000);
+
+  /**
+   * Admin status changes must win over JWT claims even before access token expires.
+   * Kept for a long TTL (or until overwritten).
+   */
+  private readonly statusOverrides = new TtlCache<string>(24 * 60 * 60 * 1000);
 
   /** Negative blacklist lookups; positive entries use token remaining TTL. */
   private readonly blacklistMissCache = new TtlCache<true>(30_000);
@@ -31,6 +37,18 @@ export class AuthSessionCacheService {
 
   invalidateUser(userId: string): void {
     this.userCache.delete(userId);
+  }
+
+  setStatusOverride(userId: string, status: string): void {
+    this.statusOverrides.set(userId, status);
+    const cached = this.userCache.get(userId);
+    if (cached) {
+      this.userCache.set(userId, { ...cached, status });
+    }
+  }
+
+  getStatusOverride(userId: string): string | undefined {
+    return this.statusOverrides.get(userId);
   }
 
   getBlacklistState(token: string): boolean | undefined {

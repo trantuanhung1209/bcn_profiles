@@ -1,4 +1,7 @@
+import { existsSync } from 'fs';
+import { join } from 'path';
 import { NestFactory } from '@nestjs/core';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
@@ -8,15 +11,37 @@ import helmet from 'helmet';
 const cookieParser = require('cookie-parser');
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    bufferLogs: true,
+  });
   const logger = app.get(WINSTON_MODULE_NEST_PROVIDER);
   app.useLogger(logger);
 
-  // Bảo mật HTTP headers
-  app.use(helmet());
+  // Bảo mật HTTP headers (nới font/style cho latency tester UI)
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        useDefaults: true,
+        directives: {
+          'style-src': ["'self'", 'https://fonts.googleapis.com'],
+          'font-src': ["'self'", 'https://fonts.gstatic.com', 'data:'],
+          'connect-src': ["'self'", 'https://profiles.uside.id.vn', 'http://127.0.0.1:3000'],
+        },
+      },
+    }),
+  );
 
   // Sử dụng cookie-parser
   app.use(cookieParser());
+
+  // FE đo latency: /latency-tester/ (same-origin cookie khi chạy trên production)
+  const latencyDir = join(process.cwd(), 'tools', 'api-latency');
+  if (existsSync(latencyDir)) {
+    app.useStaticAssets(latencyDir, {
+      prefix: '/latency-tester',
+      index: 'index.html',
+    });
+  }
   
   app.useGlobalPipes(
     new ValidationPipe({
@@ -55,6 +80,9 @@ async function bootstrap() {
   const port = getRequiredPort();
   await app.listen(port);
   logger.log(`Application is running on port: ${port}`);
+  if (existsSync(latencyDir)) {
+    logger.log(`API Latency Lab: http://localhost:${port}/latency-tester/`);
+  }
 }
 
 function getRequiredPort(): string {

@@ -1,9 +1,23 @@
 # API Documentation — BCN Profiles
 
-**Base URL:** `https://profiles.uside.studio`
+**Base URL (production):** `https://profiles.uside.id.vn`  
+**Alias / studio:** `https://profiles.uside.studio`
 
 > Tất cả request/response đều là JSON (`Content-Type: application/json`).  
-> Authentication sử dụng **HttpOnly cookie** — FE phải gửi kèm `credentials: 'include'` (fetch) hoặc `withCredentials: true` (axios).
+> Authentication sử dụng **HttpOnly cookie** — FE phải gửi kèm `credentials: 'include'` (fetch) hoặc `withCredentials: true` (axios).  
+> **Không còn Google OAuth** — chỉ login Email/Password (+ 2FA khi được bật/bắt buộc).
+
+### Checklist nhanh cho FE
+
+| Việc FE cần làm | Chi tiết |
+|---|---|
+| Luôn gửi cookie | `credentials: 'include'` / `withCredentials: true` |
+| Branch sau login | Xử lý 3 case: `skipTwoFactor` / `requiresTwoFactorVerification` / `requiresTwoFactorSetup` |
+| Challenge token = **1 lần dùng** | `verificationToken` / `setupToken` / `recoveryToken` bị vô hiệu sau verify/confirm/reset thành công |
+| Setup confirm | Body chỉ cần `{ code }` ( `secret` optional, server lấy từ setupToken ) |
+| Recovery reset | Body **bắt buộc** `{ password }` + header `Authorization: Bearer <recoveryToken>` |
+| 401 → refresh → retry | `POST /auth/refresh` rotate cả access+refresh; refresh cũ không dùng lại được |
+| Logout | Cookie bị clear + token bị revoke server-side |
 
 ---
 
@@ -153,7 +167,7 @@ Lấy thông tin profile đầy đủ của user đang đăng nhập từ databa
 
 ### GET `/auth/me`
 
-Lấy thông tin user từ JWT payload (không truy vấn DB). Dùng để kiểm tra nhanh trạng thái đăng nhập.
+Lấy thông tin user đang đăng nhập (từ session cache / DB). Dùng để kiểm tra nhanh trạng thái đăng nhập.
 
 **Auth:** JWT cookie  
 **Rate limit:** Không giới hạn
@@ -164,20 +178,23 @@ Lấy thông tin user từ JWT payload (không truy vấn DB). Dùng để kiể
   "user": {
     "id": "uuid",
     "email": "user@example.com",
+    "fullName": "Nguyễn Văn A",
+    "avatar": null,
     "role": "USER",
-    "iat": 1234567890,
-    "exp": 1234571490
+    "status": "ACTIVE",
+    "createdAt": "2026-01-01T00:00:00.000Z",
+    "updatedAt": "2026-01-01T00:00:00.000Z"
   }
 }
 ```
 
-> **Lưu ý:** Đây là JWT payload — không phải dữ liệu DB. Dùng `GET /auth/profile` nếu cần dữ liệu mới nhất.
+> Dùng `GET /auth/profile` hoặc `GET /users/me/profile` nếu cần dữ liệu hồ sơ đầy đủ hơn.
 
 ---
 
 ### POST `/auth/logout`
 
-Đăng xuất. Xóa cookies và thêm `access_token` hiện tại vào blacklist (không dùng được nữa dù chưa hết hạn).
+Đăng xuất: clear cookies và **revoke** `access_token` + `refresh_token` hiện tại (jti bị blacklist — không dùng lại được dù chưa hết hạn).
 
 **Auth:** JWT cookie  
 **Rate limit:** default
@@ -193,14 +210,14 @@ Lấy thông tin user từ JWT payload (không truy vấn DB). Dùng để kiể
 
 ### POST `/auth/refresh`
 
-Làm mới `access_token` dùng `refresh_token` còn trong cookie. Gọi endpoint này khi nhận được lỗi `401` từ bất kỳ API nào.
+Rotate cặp token bằng `refresh_token` trong cookie. Gọi khi nhận `401` từ API bảo vệ.
 
 **Auth:** Public (đọc `refresh_token` cookie tự động)  
 **Rate limit:** 100 req / phút
 
 **Success (200):**
 
-Cookie `access_token` + `refresh_token` được cập nhật.
+Cookie `access_token` + `refresh_token` được cập nhật. **Refresh cũ bị revoke ngay** (không reuse được).
 ```json
 {
   "message": "Làm mới token thành công",
@@ -216,7 +233,7 @@ Cookie `access_token` + `refresh_token` được cập nhật.
 ```
 
 **Errors:**
-- `401` — Không có refresh token, token không hợp lệ, hoặc tài khoản bị khóa/chờ duyệt
+- `401` — Không có refresh token, token không đúng type/`jti`, đã bị revoke, hoặc tài khoản bị khóa/chờ duyệt
 
 ---
 
@@ -332,39 +349,7 @@ Bước 2 của đổi email: xác nhận OTP và cập nhật email mới vào 
 
 ---
 
-### GET `/auth/google`
-
-Khởi tạo luồng đăng nhập Google OAuth. Trình duyệt sẽ được redirect đến trang đăng nhập của Google.
-
-**Auth:** Public
-
-> **Lưu ý:** Endpoint này redirect trực tiếp — không trả JSON. Dùng bằng cách mở URL trong trình duyệt hoặc `window.location.href`.
-
----
-
-### GET `/auth/google/callback`
-
-Callback tự động được gọi sau khi user xác nhận với Google. Không gọi trực tiếp từ FE.
-
-**Auth:** Public (xử lý bởi GoogleAuthGuard)
-
-**Success:** Cookie `access_token` + `refresh_token` được set.
-```json
-{
-  "message": "Đăng nhập Google thành công",
-  "user": {
-    "id": "uuid",
-    "email": "user@gmail.com",
-    "fullName": "Nguyễn Văn A",
-    "avatar": "https://lh3.googleusercontent.com/...",
-    "role": "USER"
-  }
-}
-```
-
-**Errors:**
-- `401` — Tài khoản đang chờ duyệt hoặc bị khóa
-- `401` — Email chưa có tài khoản: tự động tạo mới với `PENDING`, trả 401 luôn (phải chờ admin duyệt)
+> **Removed:** `GET /auth/google` và `GET /auth/google/callback` đã bị gỡ. FE không còn nút/luồng Google Login.
 
 ---
 
@@ -395,18 +380,22 @@ POST /auth/login  { email, password }
 ```
 1. POST /auth/login
    └─ { requiresTwoFactorVerification: true, verificationToken }
+      (chưa có cookie; token single-use, TTL 5 phút)
 
 2. Nếu cần OTP qua email (tùy chọn):
    POST /auth/2fa/send-email-otp
    Header: Authorization: Bearer <verificationToken>
+   (bước này KHÔNG consume token)
 
-3. Xác minh bằng một trong ba cách:
+3. Xác minh bằng ĐÚNG MỘT trong ba cách:
    POST /auth/2fa/verify/totp         body: { code: "123456" }
    POST /auth/2fa/verify/email        body: { code: "789012" }
    POST /auth/2fa/verify/backup-code  body: { code: "ABCD1234" }
    Header: Authorization: Bearer <verificationToken>
 
-   └─ set cookies → done ✅
+   └─ set cookies → verificationToken bị consume (không reuse) ✅
+
+FE note: sau khi verify thành công, đừng giữ/reuse verificationToken.
 ```
 
 ---
@@ -420,13 +409,15 @@ POST /auth/login  { email, password }
 2. POST /auth/2fa/setup/initiate
    Header: Authorization: Bearer <setupToken>
    Body:   { password: "user_password" }
-   └─ { secret, qrCode, setupToken (mới, chứa secret) }
-   → User quét QR bằng app Authenticator
+   └─ { secret, qrCode, setupToken (MỚI) }
+   → Hiển thị QR / cho user nhập secret vào Authenticator
+   → setupToken cũ (từ login) bị consume; FE phải dùng setupToken mới
 
 3. POST /auth/2fa/setup/confirm
    Header: Authorization: Bearer <setupToken mới>
-   Body:   { secret: "BASE32...", code: "123456" }
+   Body:   { code: "123456" }          // secret optional
    └─ { backupCodes: [...10 codes...], user } + set cookies → done ✅
+   → Bắt buộc UI lưu backup codes (chỉ hiện 1 lần)
 ```
 
 ---
@@ -442,8 +433,9 @@ POST /auth/login  { email, password }
 
 2. POST /auth/2fa/me/enable/confirm
    Header: Authorization: Bearer <setupToken>
-   Body:   { secret: "BASE32...", code: "123456" }
+   Body:   { code: "123456" }          // secret optional
    └─ { backupCodes: [...10 codes...] } — không đổi cookie ✅
+   → setupToken bị consume
 ```
 
 ---
@@ -463,20 +455,22 @@ Body:   { password: "user_password", totpCode: "123456" }
 
 ### Luồng F — Khôi phục khi mất thiết bị Authenticator
 
-Dùng khi user không truy cập được app và đã dùng hết backup codes.
+Dùng khi user không truy cập được app Authenticator (ưu tiên backup code trước khi vào recovery).
 
 ```
 1. POST /auth/2fa/recovery/request
    Body: { email: "user@example.com" }
-   └─ Gửi OTP đến email
+   └─ Response luôn generic (không lộ email tồn tại)
+   └─ OTP chỉ được gửi nếu email ACTIVE và đã bật 2FA
 
 2. POST /auth/2fa/recovery/verify-email
    Body: { email: "user@example.com", recoveryOtp: "654321" }
-   └─ { recoveryToken } — hết hạn sau 30 phút
+   └─ { recoveryToken } — hết hạn sau 30 phút, single-use
 
 3. POST /auth/2fa/recovery/reset
    Header: Authorization: Bearer <recoveryToken>
-   └─ 2FA bị tắt hoàn toàn → đăng nhập lại bình thường ✅
+   Body:   { password: "user_password" }   // BẮT BUỘC
+   └─ 2FA bị tắt → đăng nhập lại ✅
       (nếu twoFactorRequired=true: phải đi lại Luồng C)
 ```
 
@@ -505,10 +499,10 @@ Body: { reason?: "User request recovery" }
 
 ### POST `/auth/2fa/setup/initiate`
 
-Bước 1 của setup flow (bị admin enforce): xác minh mật khẩu, tạo TOTP secret và QR code. Trả về `setupToken` mới có nhúng secret để dùng ở bước confirm.
+Bước 1 của setup flow (bị admin enforce): xác minh mật khẩu, tạo TOTP secret và QR code. Trả về `setupToken` **mới** (setupToken từ login bị consume).
 
 **Auth:** `setupToken` trong header (`Authorization: Bearer <setupToken>`)  
-**Rate limit:** 30 req / phút
+**Rate limit:** 10 req / phút
 
 **Request Body:**
 ```json
@@ -523,13 +517,13 @@ Bước 1 của setup flow (bị admin enforce): xác minh mật khẩu, tạo T
   "success": true,
   "secret": "BASE32SECRETSTRING...",
   "qrCode": "data:image/png;base64,...",
-  "setupToken": "eyJ... (token mới, có chứa secret, hết hạn 15 phút)",
+  "setupToken": "eyJ... (token mới, hết hạn 15 phút — FE phải thay token cũ)",
   "message": "Quét mã QR bằng ứng dụng Authenticator (Google Authenticator, Authy, v.v.)"
 }
 ```
 
 **Errors:**
-- `401` — Mật khẩu không đúng hoặc setupToken không hợp lệ/hết hạn
+- `401` — Mật khẩu không đúng hoặc setupToken không hợp lệ/hết hạn/đã dùng
 
 ---
 
@@ -537,20 +531,24 @@ Bước 1 của setup flow (bị admin enforce): xác minh mật khẩu, tạo T
 
 Bước 2 của setup flow (bị admin enforce): xác minh TOTP, lưu vào DB, tạo backup codes, và cấp tokens để đăng nhập ngay.
 
-**Auth:** `setupToken` (có chứa secret) trong header  
-**Rate limit:** 30 req / phút
+**Auth:** `setupToken` (từ bước initiate) trong header  
+**Rate limit:** 10 req / phút
 
 **Request Body:**
 ```json
 {
-  "secret": "BASE32SECRETSTRING...",
   "code": "123456"
 }
 ```
 
+| Field | Bắt buộc | Ghi chú |
+|---|---|---|
+| `code` | ✅ | 6 chữ số TOTP |
+| `secret` | ❌ | Optional (legacy). Server dùng secret gắn với setupToken |
+
 **Success (200):**
 
-Cookie `access_token` + `refresh_token` được set.
+Cookie `access_token` + `refresh_token` được set. `setupToken` bị consume.
 ```json
 {
   "success": true,
@@ -565,8 +563,8 @@ Cookie `access_token` + `refresh_token` được set.
 ```
 
 **Errors:**
-- `400` — Thiếu secret hoặc sai format base32
-- `401` — TOTP không đúng hoặc secret không khớp với setupToken
+- `400` — Thiếu `code`
+- `401` — TOTP sai, setupToken đã dùng/hết hạn, hoặc `secret` (nếu gửi) không khớp
 
 > ⚠️ **Quan trọng:** Backup codes chỉ hiển thị **một lần duy nhất** ngay tại bước này. Hãy lưu lại trước khi đóng.
 
@@ -577,7 +575,7 @@ Cookie `access_token` + `refresh_token` được set.
 Xác minh 2FA bằng mã TOTP từ app Authenticator sau khi login.
 
 **Auth:** `verificationToken` trong header  
-**Rate limit:** 50 req / phút
+**Rate limit:** 10 req / phút
 
 **Header:**
 ```
@@ -593,7 +591,7 @@ Authorization: Bearer <verificationToken>
 
 **Success (200):**
 
-Cookie `access_token` + `refresh_token` được set.
+Cookie `access_token` + `refresh_token` được set. `verificationToken` bị consume.
 ```json
 {
   "success": true,
@@ -603,7 +601,7 @@ Cookie `access_token` + `refresh_token` được set.
 ```
 
 **Errors:**
-- `401` — verificationToken không hợp lệ/hết hạn, mã TOTP sai, hoặc 2FA chưa được thiết lập
+- `401` — verificationToken không hợp lệ/hết hạn/đã dùng, mã TOTP sai, hoặc 2FA chưa được thiết lập
 
 ---
 
@@ -612,7 +610,7 @@ Cookie `access_token` + `refresh_token` được set.
 Gửi OTP 6 chữ số đến email của user để dùng thay cho TOTP khi không có app Authenticator.
 
 **Auth:** `verificationToken` trong header  
-**Rate limit:** 30 req / 5 phút
+**Rate limit:** 5 req / 5 phút
 
 **Header:**
 ```
@@ -628,7 +626,7 @@ Authorization: Bearer <verificationToken>
 ```
 
 **Errors:**
-- `401` — verificationToken không hợp lệ/hết hạn
+- `401` — verificationToken không hợp lệ/hết hạn/đã dùng
 
 ---
 
@@ -637,7 +635,7 @@ Authorization: Bearer <verificationToken>
 Xác minh 2FA bằng OTP đã nhận qua email (dùng sau khi gọi `send-email-otp`).
 
 **Auth:** `verificationToken` trong header  
-**Rate limit:** 50 req / phút
+**Rate limit:** 10 req / phút
 
 **Header:**
 ```
@@ -653,7 +651,7 @@ Authorization: Bearer <verificationToken>
 
 **Success (200):**
 
-Cookie `access_token` + `refresh_token` được set.
+Cookie `access_token` + `refresh_token` được set. `verificationToken` bị consume.
 ```json
 {
   "success": true,
@@ -663,7 +661,7 @@ Cookie `access_token` + `refresh_token` được set.
 ```
 
 **Errors:**
-- `401` — OTP không chính xác hoặc đã hết hạn (OTP có hiệu lực 15 phút)
+- `401` — OTP không chính xác hoặc đã hết hạn (OTP có hiệu lực 15 phút), hoặc token đã dùng
 
 ---
 
@@ -672,7 +670,7 @@ Cookie `access_token` + `refresh_token` được set.
 Xác minh 2FA bằng backup code dự phòng. Mỗi code chỉ dùng được một lần.
 
 **Auth:** `verificationToken` trong header  
-**Rate limit:** 50 req / phút
+**Rate limit:** 10 req / phút
 
 **Header:**
 ```
@@ -688,7 +686,7 @@ Authorization: Bearer <verificationToken>
 
 **Success (200):**
 
-Cookie `access_token` + `refresh_token` được set.
+Cookie `access_token` + `refresh_token` được set. `verificationToken` bị consume.
 ```json
 {
   "success": true,
@@ -699,16 +697,16 @@ Cookie `access_token` + `refresh_token` được set.
 ```
 
 **Errors:**
-- `401` — Backup code sai hoặc đã được sử dụng trước đó
+- `401` — Backup code sai/đã dùng, hoặc verificationToken đã dùng
 
 ---
 
 ### POST `/auth/2fa/recovery/request`
 
-Gửi OTP khôi phục đến email để bắt đầu quá trình reset 2FA khi mất thiết bị. Response luôn thành công để không lộ thông tin email tồn tại hay không.
+Bắt đầu recovery. Response luôn generic để không lộ email tồn tại. OTP chỉ gửi nếu user `ACTIVE` và `twoFactorEnabled = true`.
 
 **Auth:** Public  
-**Rate limit:** 20 req / 15 phút
+**Rate limit:** 3 req / 15 phút
 
 **Request Body:**
 ```json
@@ -721,7 +719,7 @@ Gửi OTP khôi phục đến email để bắt đầu quá trình reset 2FA khi
 ```json
 {
   "success": true,
-  "message": "Nếu email tồn tại, bạn sẽ nhận được mã khôi phục. Vui lòng kiểm tra hộp thư.",
+  "message": "Nếu email tồn tại và đã bật 2FA, bạn sẽ nhận được mã khôi phục.",
   "nextStep": "Sử dụng mã để xác nhận yêu cầu khôi phục"
 }
 ```
@@ -733,7 +731,7 @@ Gửi OTP khôi phục đến email để bắt đầu quá trình reset 2FA khi
 Xác minh OTP khôi phục và nhận `recoveryToken` để thực hiện reset 2FA.
 
 **Auth:** Public  
-**Rate limit:** 50 req / phút
+**Rate limit:** 10 req / phút
 
 **Request Body:**
 ```json
@@ -747,23 +745,30 @@ Xác minh OTP khôi phục và nhận `recoveryToken` để thực hiện reset 
 ```json
 {
   "success": true,
-  "recoveryToken": "eyJ... (hết hạn sau 30 phút)",
-  "message": "Xác minh email thành công. Bây giờ bạn có thể reset 2FA.",
-  "nextStep": "Gọi endpoint reset 2FA recovery với recovery token này"
+  "recoveryToken": "eyJ... (hết hạn sau 30 phút, single-use)",
+  "message": "Xác minh email thành công. Nhập mật khẩu tài khoản để reset 2FA.",
+  "nextStep": "Gọi endpoint reset 2FA recovery với recovery token + password"
 }
 ```
 
 **Errors:**
-- `401` — OTP không đúng/hết hạn hoặc email không tồn tại
+- `401` — OTP không đúng/hết hạn, hoặc tài khoản không đủ điều kiện recovery
 
 ---
 
 ### POST `/auth/2fa/recovery/reset`
 
-Bước cuối của luồng khôi phục: tắt 2FA hoàn toàn. Sau đó user đăng nhập lại bình thường (nếu `twoFactorRequired = true` sẽ phải setup lại).
+Bước cuối: tắt 2FA. **Bắt buộc mật khẩu tài khoản** + `recoveryToken`.
 
 **Auth:** `recoveryToken` trong header (`Authorization: Bearer <recoveryToken>`)  
-**Rate limit:** 30 req / phút
+**Rate limit:** 5 req / phút
+
+**Request Body:**
+```json
+{
+  "password": "user_password"
+}
+```
 
 **Success (200):**
 ```json
@@ -775,7 +780,7 @@ Bước cuối của luồng khôi phục: tắt 2FA hoàn toàn. Sau đó user 
 ```
 
 **Errors:**
-- `401` — recoveryToken không hợp lệ hoặc hết hạn
+- `401` — recoveryToken không hợp lệ/hết hạn/đã dùng, hoặc mật khẩu sai
 
 ---
 
@@ -832,7 +837,7 @@ Bước 1 của luồng tự bật 2FA: xác minh mật khẩu và nhận QR cod
 Bước 2 của luồng tự bật 2FA: xác minh TOTP, lưu DB, nhận backup codes. Không cấp token mới vì user đã đăng nhập sẵn.
 
 **Auth:** `setupToken` trong header (từ bước initiate)  
-**Rate limit:** 50 req / phút
+**Rate limit:** 10 req / phút
 
 **Header:**
 ```
@@ -842,10 +847,14 @@ Authorization: Bearer <setupToken>
 **Request Body:**
 ```json
 {
-  "secret": "BASE32SECRETSTRING...",
   "code": "123456"
 }
 ```
+
+| Field | Bắt buộc | Ghi chú |
+|---|---|---|
+| `code` | ✅ | 6 chữ số TOTP |
+| `secret` | ❌ | Optional (legacy) |
 
 **Success (200):**
 ```json
@@ -861,8 +870,8 @@ Authorization: Bearer <setupToken>
 ```
 
 **Errors:**
-- `400` — Secret không khớp với setupToken
-- `401` — Mã TOTP không đúng
+- `400` — Secret (nếu gửi) không khớp setupToken
+- `401` — Mã TOTP sai hoặc setupToken đã dùng/hết hạn
 
 > ⚠️ Backup codes chỉ hiển thị **một lần duy nhất**. Lưu lại ngay.
 
@@ -1486,32 +1495,99 @@ Xóa timeline event. Chỉ admin mới có quyền xóa.
 
 | Cookie | Max-Age | HttpOnly | Secure | SameSite | Domain (prod) |
 |---|---|---|---|---|---|
-| `access_token` | 60 phút | ✅ | ✅ (prod) | `none` | `.uside.studio` |
-| `refresh_token` | 7 ngày | ✅ | ✅ (prod) | `none` | `.uside.studio` |
+| `access_token` | 60 phút | ✅ | ✅ (prod) | `none` | `.uside.id.vn` hoặc `.uside.studio` (theo host API) |
+| `refresh_token` | 7 ngày | ✅ | ✅ (prod) | `none` | `.uside.id.vn` hoặc `.uside.studio` (theo host API) |
 
 > **Development:** `secure: false`, không có `domain`, `sameSite: none` — cho phép cross-origin giữa các port localhost.
 
+### Token model (FE cần biết)
+
+- Access/refresh là JWT có `type` (`access` \| `refresh`) và `jti`.
+- Refresh **rotate**: mỗi lần `POST /auth/refresh` thành công → cặp cookie mới, refresh cũ bị revoke.
+- Logout revoke cả access + refresh hiện tại.
+- Challenge tokens (`setup` / `verify` / `recovery`) là **single-use** + có TTL; reuse sau success → `401`.
+
 ### TTL của các intermediate tokens (2FA)
 
-| Token | TTL | Dùng cho |
-|---|---|---|
-| `setupToken` | 15 phút | Setup flow (bắt buộc hoặc tự nguyện) |
-| `verificationToken` | 5 phút | Verify 2FA khi login |
-| `recoveryToken` | 30 phút | Reset 2FA qua recovery flow |
+| Token | TTL | Single-use | Dùng cho |
+|---|---|---|---|
+| `setupToken` | 15 phút | ✅ | Setup flow (bắt buộc hoặc tự nguyện) |
+| `verificationToken` | 5 phút | ✅ (sau verify thành công) | Verify 2FA khi login |
+| `recoveryToken` | 30 phút | ✅ | Reset 2FA qua recovery flow |
 
 ### FE setup cơ bản
 
 ```js
 // axios — áp dụng một lần toàn app
 axios.defaults.withCredentials = true;
+axios.defaults.baseURL = 'https://profiles.uside.id.vn';
 
 // fetch — thêm vào từng request
-fetch('/auth/login', {
+fetch('https://profiles.uside.id.vn/auth/login', {
   method: 'POST',
   credentials: 'include',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({ email, password }),
 });
+```
+
+### Pseudo-code: login + 2FA branch
+
+```js
+async function login(email, password) {
+  const { data } = await api.post('/auth/login', { email, password });
+  const payload = data.data ?? data;
+
+  if (payload.skipTwoFactor) {
+    // cookies đã set → vào app
+    return { status: 'authenticated', user: payload.user };
+  }
+
+  if (payload.requiresTwoFactorVerification) {
+    // lưu verificationToken trong memory (không localStorage nếu có thể)
+    return {
+      status: 'need_2fa_verify',
+      verificationToken: payload.verificationToken,
+    };
+  }
+
+  if (payload.requiresTwoFactorSetup) {
+    return {
+      status: 'need_2fa_setup',
+      setupToken: payload.setupToken,
+    };
+  }
+
+  throw new Error('Unexpected login response');
+}
+
+async function verifyTotp(verificationToken, code) {
+  const { data } = await api.post(
+    '/auth/2fa/verify/totp',
+    { code },
+    { headers: { Authorization: `Bearer ${verificationToken}` } },
+  );
+  // cookies set; đừng reuse verificationToken
+  return data.data ?? data;
+}
+
+async function confirmForcedSetup(setupTokenFromInitiate, code) {
+  const { data } = await api.post(
+    '/auth/2fa/setup/confirm',
+    { code }, // secret không bắt buộc
+    { headers: { Authorization: `Bearer ${setupTokenFromInitiate}` } },
+  );
+  // hiện backupCodes 1 lần rồi clear khỏi state
+  return data.data ?? data;
+}
+
+async function recoveryReset(recoveryToken, password) {
+  return api.post(
+    '/auth/2fa/recovery/reset',
+    { password },
+    { headers: { Authorization: `Bearer ${recoveryToken}` } },
+  );
+}
 ```
 
 ### Tự động refresh token
@@ -1520,12 +1596,15 @@ fetch('/auth/login', {
 axios.interceptors.response.use(
   (res) => res,
   async (error) => {
-    if (error.response?.status === 401 && !error.config._retry) {
-      error.config._retry = true;
+    const original = error.config;
+    if (error.response?.status === 401 && !original._retry) {
+      original._retry = true;
       try {
-        await axios.post('/auth/refresh');
-        return axios(error.config);
+        // rotate cookies; refresh cũ sẽ chết
+        await axios.post('/auth/refresh', null, { withCredentials: true });
+        return axios(original);
       } catch {
+        // clear client auth state
         window.location.href = '/login';
       }
     }
@@ -1593,14 +1672,14 @@ Vượt rate limit.
 | `POST /auth/reset-password` | 50 req / phút |
 | `POST /auth/change-email/request` | 30 req / 15 phút |
 | `POST /auth/change-email/confirm` | 50 req / 15 phút |
-| `POST /auth/2fa/setup/initiate` | 30 req / phút |
-| `POST /auth/2fa/setup/confirm` | 30 req / phút |
-| `POST /auth/2fa/verify/*` | 50 req / phút |
-| `POST /auth/2fa/send-email-otp` | 30 req / 5 phút |
-| `POST /auth/2fa/recovery/request` | 20 req / 15 phút |
-| `POST /auth/2fa/recovery/verify-email` | 50 req / phút |
-| `POST /auth/2fa/recovery/reset` | 30 req / phút |
+| `POST /auth/2fa/setup/initiate` | 10 req / phút |
+| `POST /auth/2fa/setup/confirm` | 10 req / phút |
+| `POST /auth/2fa/verify/*` | 10 req / phút |
+| `POST /auth/2fa/send-email-otp` | 5 req / 5 phút |
+| `POST /auth/2fa/recovery/request` | 3 req / 15 phút |
+| `POST /auth/2fa/recovery/verify-email` | 10 req / phút |
+| `POST /auth/2fa/recovery/reset` | 5 req / phút |
 | `POST /auth/2fa/me/enable/initiate` | 30 req / phút |
-| `POST /auth/2fa/me/enable/confirm` | 50 req / phút |
+| `POST /auth/2fa/me/enable/confirm` | 10 req / phút |
 | `POST /auth/2fa/me/disable` | 30 req / phút |
 | `GET /auth/me`, `GET /auth/2fa/me/status` | Không giới hạn |

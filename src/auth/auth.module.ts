@@ -3,17 +3,20 @@ import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
-import { AuthController } from './auth.controller';
-import { AuthService } from './auth.service';
 import { PrismaModule } from '../prisma/prisma.module';
-import { LocalStrategy } from './strategies/local.strategy';
-import { JwtStrategy } from './strategies/jwt.strategy';
+import { AuthController } from './controllers/auth.controller';
+import { TwoFactorController } from './controllers/two-factor.controller';
+import { AuthService } from './services/auth.service';
+import { AuthTokenService } from './services/auth-token.service';
+import { AuthCookiesService } from './services/auth-cookies.service';
 import { AuthSessionCacheService } from './services/auth-session-cache.service';
+import { AuthChallengeService } from './services/auth-challenge.service';
+import { TokenRevocationService } from './services/token-revocation.service';
 import { EmailService } from './services/email.service';
 import { MailQueueService } from './services/mail-queue.service';
 import { TwoFactorAuthService } from './services/two-factor-auth.service';
-import { AuthChallengeService } from './services/auth-challenge.service';
-import { TokenRevocationService } from './services/token-revocation.service';
+import { LocalStrategy } from './strategies/local.strategy';
+import { JwtStrategy } from './strategies/jwt.strategy';
 import { TwoFactorSetupGuard } from './guards/two-factor-setup.guard';
 import { TwoFactorVerificationGuard } from './guards/two-factor-verification.guard';
 import { TwoFactorRecoveryGuard } from './guards/two-factor-recovery.guard';
@@ -38,9 +41,11 @@ import { TwoFactorRecoveryGuard } from './guards/two-factor-recovery.guard';
       inject: [ConfigService],
     }),
   ],
-  controllers: [AuthController],
+  controllers: [AuthController, TwoFactorController],
   providers: [
     AuthService,
+    AuthTokenService,
+    AuthCookiesService,
     LocalStrategy,
     JwtStrategy,
     AuthSessionCacheService,
@@ -55,6 +60,7 @@ import { TwoFactorRecoveryGuard } from './guards/two-factor-recovery.guard';
   ],
   exports: [
     AuthService,
+    AuthTokenService,
     AuthSessionCacheService,
     TwoFactorAuthService,
     EmailService,

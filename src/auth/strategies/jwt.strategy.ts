@@ -4,7 +4,6 @@ import { ExtractJwt, Strategy } from 'passport-jwt';
 import { Request } from 'express';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma/prisma.service';
-import { TokenBlacklistService } from '../services/token-blacklist.service';
 import {
   AuthSessionCacheService,
   CachedAuthUser,
@@ -28,15 +27,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(
     private prisma: PrismaService,
     private configService: ConfigService,
-    private tokenBlacklistService: TokenBlacklistService,
     private readonly sessionCache: AuthSessionCacheService,
   ) {
     super({
       jwtFromRequest: ExtractJwt.fromExtractors([
-        (request: Request) => {
-          const token = request?.cookies?.access_token;
-          return token;
-        },
+        (request: Request) => request?.cookies?.access_token,
       ]),
       ignoreExpiration: false,
       secretOrKey: configService.get<string>('JWT_SECRET') || 'your-secret-key',
@@ -44,25 +39,14 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  async validate(request: Request, payload: AccessTokenPayload) {
+  async validate(_request: Request, payload: AccessTokenPayload) {
     try {
-      this.logger.debug(`JWT payload received for user_id=${payload?.sub ?? 'unknown'}`);
-
-      const token = request?.cookies?.access_token;
       const userId = payload?.sub;
-
       if (!userId) {
         throw new UnauthorizedException('Token không hợp lệ');
       }
 
-      if (token && (await this.tokenBlacklistService.isBlacklisted(token))) {
-        this.logger.warn(`Blacklisted JWT rejected for user_id=${userId}`);
-        throw new UnauthorizedException('Token đã bị vô hiệu hóa. Vui lòng đăng nhập lại');
-      }
-
       const user = await this.resolveUser(userId, payload);
-      this.logger.debug(`JWT user resolved for user_id=${userId} found=${Boolean(user)}`);
-
       if (!user) {
         throw new UnauthorizedException('Người dùng không tồn tại');
       }

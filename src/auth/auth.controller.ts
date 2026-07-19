@@ -14,7 +14,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import type { CookieOptions, Response } from 'express';
+import type { CookieOptions, Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { AuthGuard } from '@nestjs/passport';
 import { User } from './decorators/user.decorator';
@@ -43,13 +43,38 @@ export class AuthController {
 
   private readonly isProduction = process.env.NODE_ENV === 'production';
 
-  private get baseCookieOptions(): CookieOptions {
+  /**
+   * Cookie Domain must be a suffix of the API host. Pick parent domain from the
+   * request host so both *.uside.studio and *.uside.id.vn work.
+   */
+  private resolveCookieDomain(req: Request): string | undefined {
+    const forwarded = String(req.headers['x-forwarded-host'] ?? '')
+      .split(',')[0]
+      .trim()
+      .toLowerCase();
+    const host = (forwarded || String(req.headers.host ?? ''))
+      .toLowerCase()
+      .split(':')[0];
+
+    if (host === 'uside.id.vn' || host.endsWith('.uside.id.vn')) {
+      return '.uside.id.vn';
+    }
+    if (host === 'uside.studio' || host.endsWith('.uside.studio')) {
+      return '.uside.studio';
+    }
+
+    // Generic host (e.g. herokuapp.com): omit Domain so the cookie is host-only.
+    return undefined;
+  }
+
+  private baseCookieOptions(req: Request): CookieOptions {
     if (this.isProduction) {
+      const domain = this.resolveCookieDomain(req);
       return {
         httpOnly: true,
         secure: true,
         sameSite: 'none',
-        domain: '.uside.studio',
+        ...(domain ? { domain } : {}),
         path: '/',
       };
     }
@@ -65,16 +90,16 @@ export class AuthController {
     };
   }
 
-  private get accessTokenCookieOptions(): CookieOptions {
+  private accessTokenCookieOptions(req: Request): CookieOptions {
     return {
-      ...this.baseCookieOptions,
+      ...this.baseCookieOptions(req),
       maxAge: 60 * 60 * 1000,
     };
   }
 
-  private get refreshTokenCookieOptions(): CookieOptions {
+  private refreshTokenCookieOptions(req: Request): CookieOptions {
     return {
-      ...this.baseCookieOptions,
+      ...this.baseCookieOptions(req),
       maxAge: 7 * 24 * 60 * 60 * 1000,
     };
   }
@@ -126,8 +151,8 @@ export class AuthController {
     if (result.skipTwoFactor) {
       const tokens = await this.authService.generateTokensAfterTwoFactorVerification(user.id);
 
-      response.cookie('access_token', tokens.access_token, this.accessTokenCookieOptions);
-      response.cookie('refresh_token', tokens.refresh_token, this.refreshTokenCookieOptions);
+      response.cookie('access_token', tokens.access_token, this.accessTokenCookieOptions(response.req));
+      response.cookie('refresh_token', tokens.refresh_token, this.refreshTokenCookieOptions(response.req));
 
       return {
         message: 'Đăng nhập thành công (2FA không bắt buộc)',
@@ -157,8 +182,8 @@ export class AuthController {
   async logout(@Res({ passthrough: true }) response: Response) {
     // Stateless JWT: logout only clears cookies. Token remains cryptographically
     // valid until exp; clients must drop cookies and stop sending the token.
-    response.clearCookie('access_token', this.baseCookieOptions);
-    response.clearCookie('refresh_token', this.baseCookieOptions);
+    response.clearCookie('access_token', this.baseCookieOptions(response.req));
+    response.clearCookie('refresh_token', this.baseCookieOptions(response.req));
 
     return {
       message: 'Đăng xuất thành công',
@@ -180,10 +205,10 @@ export class AuthController {
     const result = await this.authService.refreshTokens(refreshToken);
 
     // Set access token mới vào cookie
-    response.cookie('access_token', result.access_token, this.accessTokenCookieOptions);
+    response.cookie('access_token', result.access_token, this.accessTokenCookieOptions(response.req));
 
     // Set refresh token mới vào cookie
-    response.cookie('refresh_token', result.refresh_token, this.refreshTokenCookieOptions);
+    response.cookie('refresh_token', result.refresh_token, this.refreshTokenCookieOptions(response.req));
 
     return {
       message: 'Làm mới token thành công',
@@ -244,10 +269,10 @@ export class AuthController {
     const result = await this.authService.googleLogin(user);
 
     // Set access token vào cookie
-    response.cookie('access_token', result.access_token, this.accessTokenCookieOptions);
+    response.cookie('access_token', result.access_token, this.accessTokenCookieOptions(response.req));
 
     // Set refresh token vào cookie
-    response.cookie('refresh_token', result.refresh_token, this.refreshTokenCookieOptions);
+    response.cookie('refresh_token', result.refresh_token, this.refreshTokenCookieOptions(response.req));
 
     return {
       message: 'Đăng nhập Google thành công',
@@ -348,8 +373,8 @@ export class AuthController {
     const tokens = await this.authService.generateTokensAfterTwoFactorVerification(user.userId);
 
     // Set cookies
-    response.cookie('access_token', tokens.access_token, this.accessTokenCookieOptions);
-    response.cookie('refresh_token', tokens.refresh_token, this.refreshTokenCookieOptions);
+    response.cookie('access_token', tokens.access_token, this.accessTokenCookieOptions(response.req));
+    response.cookie('refresh_token', tokens.refresh_token, this.refreshTokenCookieOptions(response.req));
 
     return {
       success: true,
@@ -407,9 +432,9 @@ export class AuthController {
     const tokens = await this.authService.generateTokensAfterTwoFactorVerification(user.userId);
 
     // Set cookies
-    response.cookie('access_token', tokens.access_token, this.accessTokenCookieOptions);
+    response.cookie('access_token', tokens.access_token, this.accessTokenCookieOptions(response.req));
 
-    response.cookie('refresh_token', tokens.refresh_token, this.refreshTokenCookieOptions);
+    response.cookie('refresh_token', tokens.refresh_token, this.refreshTokenCookieOptions(response.req));
 
     return {
       success: true,
@@ -458,9 +483,9 @@ export class AuthController {
     const tokens = await this.authService.generateTokensAfterTwoFactorVerification(user.userId);
 
     // Set cookies
-    response.cookie('access_token', tokens.access_token, this.accessTokenCookieOptions);
+    response.cookie('access_token', tokens.access_token, this.accessTokenCookieOptions(response.req));
 
-    response.cookie('refresh_token', tokens.refresh_token, this.refreshTokenCookieOptions);
+    response.cookie('refresh_token', tokens.refresh_token, this.refreshTokenCookieOptions(response.req));
 
     return {
       success: true,
@@ -509,9 +534,9 @@ export class AuthController {
     const tokens = await this.authService.generateTokensAfterTwoFactorVerification(user.userId);
 
     // Set cookies
-    response.cookie('access_token', tokens.access_token, this.accessTokenCookieOptions);
+    response.cookie('access_token', tokens.access_token, this.accessTokenCookieOptions(response.req));
 
-    response.cookie('refresh_token', tokens.refresh_token, this.refreshTokenCookieOptions);
+    response.cookie('refresh_token', tokens.refresh_token, this.refreshTokenCookieOptions(response.req));
 
     return {
       success: true,

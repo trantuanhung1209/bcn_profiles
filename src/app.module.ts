@@ -6,7 +6,6 @@ import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { WinstonModule } from 'nest-winston';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { CatsModule } from './cats/cats.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
@@ -31,7 +30,6 @@ import { createWinstonLoggerOptions } from './common/logging/winston.config';
       },
     ]),
     ScheduleModule.forRoot(),
-    CatsModule,
     PrismaModule,
     UsersModule,
     AuthModule,

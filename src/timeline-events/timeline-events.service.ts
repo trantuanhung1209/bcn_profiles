@@ -11,6 +11,7 @@ import { CreateTimelineEventDto } from './dto/create-timeline-event.dto';
 import { UpdateTimelineEventDto } from './dto/update-timeline-event.dto';
 import { UsersListCacheService } from '../users/users-list-cache.service';
 import { TimelineEventsCacheService } from './timeline-events-cache.service';
+import { Role } from '../auth/enums/role.enum';
 
 @Injectable()
 export class TimelineEventsService implements OnModuleInit {
@@ -96,9 +97,10 @@ export class TimelineEventsService implements OnModuleInit {
     return events;
   }
 
-  async findOne(id: number) {
+  async findOne(id: number, requesterId?: string, requesterRole?: string) {
     const cached = this.timelineCache.getDetail(id);
     if (cached) {
+      this.assertCanViewTimelineEvent(cached as { userUuid: string }, requesterId, requesterRole);
       return cached;
     }
 
@@ -110,8 +112,22 @@ export class TimelineEventsService implements OnModuleInit {
       throw new NotFoundException(`Timeline event with ID ${id} not found`);
     }
 
+    this.assertCanViewTimelineEvent(event, requesterId, requesterRole);
     this.timelineCache.setDetail(id, event);
     return event;
+  }
+
+  private assertCanViewTimelineEvent(
+    event: { userUuid: string },
+    requesterId?: string,
+    requesterRole?: string,
+  ) {
+    if (!requesterId) {
+      return;
+    }
+    if (event.userUuid !== requesterId && requesterRole !== Role.ADMIN) {
+      throw new ForbiddenException('You can only view your own timeline events');
+    }
   }
 
   async update(
@@ -119,7 +135,7 @@ export class TimelineEventsService implements OnModuleInit {
     userId: string,
     updateDto: UpdateTimelineEventDto,
   ) {
-    const event = await this.findOne(id) as { userUuid: string };
+    const event = await this.findOne(id, userId) as { userUuid: string };
 
     if (event.userUuid !== userId) {
       throw new ForbiddenException(

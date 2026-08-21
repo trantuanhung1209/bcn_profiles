@@ -414,7 +414,6 @@ export class UsersService implements OnModuleInit {
       where: { id },
       select: {
         id: true,
-        email: true,
         fullName: true,
         avatar: true,
         role: true,
@@ -685,23 +684,23 @@ export class UsersService implements OnModuleInit {
     return updatedUser;
   }
 
-  async searchUsers(query: string): Promise<{ id: string; fullName: string | null; avatar: string | null; metadata: any }[]> {
+  async searchUsers(
+    query: string,
+  ): Promise<{ id: string; fullName: string | null; avatar: string | null }[]> {
     const normalizedQuery = query?.trim();
     if (!normalizedQuery) return [];
 
     const cached = this.listCache.getSearch(normalizedQuery);
     if (cached) {
-      return cached as { id: string; fullName: string | null; avatar: string | null; metadata: any }[];
+      return cached as { id: string; fullName: string | null; avatar: string | null }[];
     }
 
     const results = await this.prisma.user.findMany({
       where: {
-        OR: [
-          { fullName: { contains: normalizedQuery, mode: 'insensitive' } },
-          { email: { contains: normalizedQuery, mode: 'insensitive' } },
-        ],
+        status: UserStatus.ACTIVE,
+        fullName: { contains: normalizedQuery, mode: 'insensitive' },
       },
-      select: { id: true, fullName: true, avatar: true, metadata: true },
+      select: { id: true, fullName: true, avatar: true },
       orderBy: { createdAt: 'desc' },
       take: 20,
     });

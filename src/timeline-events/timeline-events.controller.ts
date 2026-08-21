@@ -36,8 +36,12 @@ export class TimelineEventsController {
   }
 
   @Get(':id')
-  findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.timelineEventsService.findOne(id);
+  findOne(
+    @Param('id', ParseIntPipe) id: number,
+    @User('id') userId: string,
+    @User('role') role: string,
+  ) {
+    return this.timelineEventsService.findOne(id, userId, role);
   }
 
   @Patch(':id')

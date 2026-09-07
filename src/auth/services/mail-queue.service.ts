@@ -35,14 +35,6 @@ export class MailQueueService {
     });
   }
 
-  getStats() {
-    return {
-      active: this.activeCount,
-      waiting: this.queue.length,
-      maxConcurrent: this.maxConcurrent,
-    };
-  }
-
   private processQueue(): void {
     while (this.activeCount < this.maxConcurrent && this.queue.length > 0) {
       const task = this.queue.shift();

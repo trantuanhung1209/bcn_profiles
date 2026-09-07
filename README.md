@@ -91,8 +91,8 @@ src/
   users/               # Quản lý user và hồ sơ
   timeline-events/     # Timeline events theo user
   prisma/              # Prisma module/service cho NestJS
-  common/              # Utilities/interceptors dùng chung
-  middlewares/         # Middleware logging, ...
+  redis/               # Redis client (cache + throttler)
+  common/              # Filters / interceptors / logging
 
 prisma/
   schema.prisma        # Định nghĩa schema database
@@ -108,10 +108,17 @@ Tạo file `.env` từ `.env.example`:
 cp .env.example .env
 ```
 
+Infra dùng chung (Postgres database `profiles` + Redis) — chạy compose trong `bcn_quiz`:
+
+```bash
+cd ../bcn_quiz
+docker compose up -d
+```
+
 Các biến quan trọng:
 
 ```env
-DATABASE_URL="postgresql://user:password@host:5432/database"
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/profiles?schema=public"
 REDIS_URL="redis://localhost:6379"
 REDIS_KEY_PREFIX="bcn:profiles:"
 JWT_SECRET="your-strong-jwt-secret"
@@ -122,16 +129,7 @@ NODE_ENV="development"
 PORT=3000
 ```
 
-Redis local có thể dùng service trong `bcn_quiz/docker-compose.yml` (`docker compose up -d redis`).
-
-Sentinel / HA (optional):
-
-```bash
-cd ../bcn_quiz
-docker compose -f docker-compose.redis-sentinel.yml up -d
-```
-
-Rồi set `REDIS_SENTINELS` + `REDIS_SENTINEL_NAME=mymaster` (xem `.env.example`). Khi Sentinel được cấu hình, client bỏ qua `REDIS_URL`.
+Sentinel / HA (optional): xem `bcn_quiz/docker-compose.redis-sentinel.yml`.
 
 Lỗi API trả về envelope thống nhất với success:
 

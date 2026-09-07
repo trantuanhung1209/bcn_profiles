@@ -13,6 +13,7 @@ export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @Get('search')
+  @Roles(Role.ADMIN)
   async searchUsers(@Query('q') q: string) {
     const results = await this.usersService.searchUsers(q);
     return { users: results };

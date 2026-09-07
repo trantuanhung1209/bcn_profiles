@@ -75,8 +75,8 @@ BCN Profiles được xây dựng theo kiến trúc module của NestJS, tập t
 
 ### Email & OTP
 
-- `nodemailer`
-- Template email trong module auth
+- **Resend** (`resend` SDK) — OTP, approve/reject, 2FA
+- Template Handlebars trong module auth
 
 ### Dev Tools
 
@@ -108,28 +108,29 @@ Tạo file `.env` từ `.env.example`:
 cp .env.example .env
 ```
 
-Infra dùng chung (Postgres database `profiles` + Redis) — chạy compose trong `bcn_quiz`:
+Infra dùng chung (Postgres database `profiles` + Redis) — chạy từ workspace root hoặc `infra/`:
 
 ```bash
-cd ../bcn_quiz
+cd ..
 docker compose up -d
+# or: cd ../infra && docker compose up -d
 ```
 
 Các biến quan trọng:
 
 ```env
-DATABASE_URL="postgresql://postgres:postgres@localhost:5432/profiles?schema=public"
+DATABASE_URL="postgresql://postgres:postgres@localhost:5433/profiles?schema=public"
 REDIS_URL="redis://localhost:6379"
 REDIS_KEY_PREFIX="bcn:profiles:"
 JWT_SECRET="your-strong-jwt-secret"
 JWT_REFRESH_SECRET="your-strong-refresh-secret"
-EMAIL_USER="your-email@gmail.com"
-EMAIL_PASSWORD="your-app-password"
+RESEND_API_KEY="re_xxxxxxxxx"
+EMAIL_FROM="BCN Support <noreply@your-verified-domain.com>"
 NODE_ENV="development"
 PORT=3000
 ```
 
-Sentinel / HA (optional): xem `bcn_quiz/docker-compose.redis-sentinel.yml`.
+Sentinel / HA (optional): xem `../infra/docker-compose.redis-sentinel.yml`.
 
 Lỗi API trả về envelope thống nhất với success:
 

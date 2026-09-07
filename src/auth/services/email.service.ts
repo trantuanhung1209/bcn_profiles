@@ -1,106 +1,111 @@
 import { Injectable, Logger } from '@nestjs/common';
-import * as nodemailer from 'nodemailer';
 import { ConfigService } from '@nestjs/config';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as Handlebars from 'handlebars';
+import { Resend } from 'resend';
 import { MailQueueService } from './mail-queue.service';
+
+type OutboundMail = {
+  to: string;
+  subject: string;
+  html: string;
+};
 
 @Injectable()
 export class EmailService {
   private readonly logger = new Logger(EmailService.name);
-  private transporter: nodemailer.Transporter;
+  private readonly resend: Resend;
+  private readonly from: string;
 
   constructor(
     private configService: ConfigService,
     private readonly mailQueueService: MailQueueService,
   ) {
-    // Cấu hình transporter với thông tin từ .env
-    this.transporter = nodemailer.createTransport({
-      host: 'smtp.gmail.com',
-      port: 587,
-      secure: false, // STARTTLS
-      family: 4, // Force IPv4 to avoid ENETUNREACH on IPv6
-      auth: {
-        user: this.configService.get<string>('EMAIL_USER'),
-        pass: this.configService.get<string>('EMAIL_PASSWORD'),
-      },
-      tls: {
-        rejectUnauthorized: (() => {
-          const raw = this.configService
-            .get<string>('MAIL_TLS_REJECT_UNAUTHORIZED')
-            ?.trim()
-            .toLowerCase();
-          if (raw === 'false' || raw === '0') return false;
-          if (raw === 'true' || raw === '1') return true;
-          return this.configService.get<string>('NODE_ENV') === 'production';
-        })(),
-      },
-    } as any);
+    const apiKey = this.configService.get<string>('RESEND_API_KEY')?.trim();
+    if (!apiKey) {
+      throw new Error('RESEND_API_KEY environment variable is required');
+    }
+
+    this.resend = new Resend(apiKey);
+    this.from =
+      this.configService.get<string>('EMAIL_FROM')?.trim() ||
+      'BCN Support <onboarding@resend.dev>';
   }
 
-  private async enqueueMail(name: string, mailOptions: nodemailer.SendMailOptions): Promise<void> {
+  private async enqueueMail(name: string, mail: OutboundMail): Promise<void> {
     await this.mailQueueService.enqueue(name, async () => {
-      await this.transporter.sendMail(mailOptions);
+      const { error } = await this.resend.emails.send({
+        from: this.from,
+        to: mail.to,
+        subject: mail.subject,
+        html: mail.html,
+      });
+
+      if (error) {
+        throw new Error(
+          typeof error === 'object' && error && 'message' in error
+            ? String((error as { message: string }).message)
+            : 'Resend send failed',
+        );
+      }
     });
   }
 
-  /**
-   * Compile Handlebars template từ file
-   */
-  private compileTemplate(templateName: string, data: any): string {
-    // Sử dụng process.cwd() để lấy đúng đường dẫn root của project
-    const templatePath = path.join(process.cwd(), 'dist', 'auth', 'templates', `${templateName}.hbs`);
-    
-    // Fallback về src nếu đang ở development mode
+  private compileTemplate(templateName: string, data: Record<string, unknown>): string {
+    const templatePath = path.join(
+      process.cwd(),
+      'dist',
+      'auth',
+      'templates',
+      `${templateName}.hbs`,
+    );
+
     let templateSource: string;
     try {
       templateSource = fs.readFileSync(templatePath, 'utf-8');
-    } catch (error) {
-      // Nếu không tìm thấy trong dist, thử tìm trong src (development)
-      const devTemplatePath = path.join(process.cwd(), 'src', 'auth', 'templates', `${templateName}.hbs`);
+    } catch {
+      const devTemplatePath = path.join(
+        process.cwd(),
+        'src',
+        'auth',
+        'templates',
+        `${templateName}.hbs`,
+      );
       templateSource = fs.readFileSync(devTemplatePath, 'utf-8');
     }
-    
-    const template = Handlebars.compile(templateSource);
-    return template(data);
+
+    return Handlebars.compile(templateSource)(data);
   }
 
-  /**
-   * Gửi email reset password với OTP
-   */
-  async sendResetPasswordEmail(email: string, otp: string, fullName?: string): Promise<void> {
-    // Compile template với data
+  async sendResetPasswordEmail(
+    email: string,
+    otp: string,
+    fullName?: string,
+  ): Promise<void> {
     const html = this.compileTemplate('reset-password', {
       fullName,
       otp,
       year: new Date().getFullYear(),
     });
 
-    const mailOptions = {
-      from: `"BCN Support" <${this.configService.get<string>('EMAIL_USER')}>`,
-      to: email,
-      subject: 'Đặt lại mật khẩu - BCN Profiles',
-      html,
-    };
-
     try {
-      await this.enqueueMail('reset-password-email', mailOptions);
+      await this.enqueueMail('reset-password-email', {
+        to: email,
+        subject: 'Đặt lại mật khẩu - BCN Profiles',
+        html,
+      });
     } catch (error) {
-      this.logger.error('Error sending email', error instanceof Error ? error.stack : undefined);
+      this.logger.error(
+        'Error sending email',
+        error instanceof Error ? error.stack : undefined,
+      );
       throw new Error('Không thể gửi email. Vui lòng thử lại sau.');
     }
   }
 
-  /**
-   * Gửi email thông báo tài khoản bị từ chối
-   */
   async sendRejectionEmail(email: string, fullName?: string): Promise<void> {
-    const mailOptions = {
-      from: `"BCN Support" <${this.configService.get<string>('EMAIL_USER')}>`,
-      to: email,
-      subject: 'Yêu cầu đăng ký không được chấp thuận - BCN Profiles',
-      html: `
+    const html = `
         <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
           <h2 style="color: #dc2626;">Yêu cầu đăng ký không được chấp thuận</h2>
           <p>Xin chào${fullName ? ` <b>${fullName}</b>` : ''},</p>
@@ -108,25 +113,24 @@ export class EmailService {
           <p>Nếu bạn cho rằng đây là nhầm lẫn, vui lòng liên hệ với chúng tôi để được hỗ trợ.</p>
           <p style="margin-top:24px;color:#6b7280;font-size:12px;">© ${new Date().getFullYear()} BCN Profiles</p>
         </div>
-      `,
-    };
+      `;
 
     try {
-      await this.enqueueMail('rejection-email', mailOptions);
+      await this.enqueueMail('rejection-email', {
+        to: email,
+        subject: 'Yêu cầu đăng ký không được chấp thuận - BCN Profiles',
+        html,
+      });
     } catch (error) {
-      this.logger.error('Error sending rejection email', error instanceof Error ? error.stack : undefined);
+      this.logger.error(
+        'Error sending rejection email',
+        error instanceof Error ? error.stack : undefined,
+      );
     }
   }
 
-  /**
-   * Gửi email thông báo tài khoản đã được admin phê duyệt
-   */
   async sendApprovalEmail(email: string, fullName?: string): Promise<void> {
-    const mailOptions = {
-      from: `"BCN Support" <${this.configService.get<string>('EMAIL_USER')}>`,
-      to: email,
-      subject: 'Tài khoản của bạn đã được phê duyệt - BCN Profiles',
-      html: `
+    const html = `
         <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
           <h2 style="color: #16a34a;">Tài khoản đã được phê duyệt ✅</h2>
           <p>Xin chào${fullName ? ` <b>${fullName}</b>` : ''},</p>
@@ -136,26 +140,29 @@ export class EmailService {
           >Đăng nhập ngay</a>
           <p style="margin-top:24px;color:#6b7280;font-size:12px;">© ${new Date().getFullYear()} BCN Profiles</p>
         </div>
-      `,
-    };
+      `;
 
     try {
-      await this.enqueueMail('approval-email', mailOptions);
+      await this.enqueueMail('approval-email', {
+        to: email,
+        subject: 'Tài khoản của bạn đã được phê duyệt - BCN Profiles',
+        html,
+      });
     } catch (error) {
-      this.logger.error('Error sending approval email', error instanceof Error ? error.stack : undefined);
+      this.logger.error(
+        'Error sending approval email',
+        error instanceof Error ? error.stack : undefined,
+      );
       throw new Error('Không thể gửi email thông báo. Vui lòng thử lại sau.');
     }
   }
 
-  /**
-   * Gửi OTP xác nhận đổi email đến địa chỉ email mới
-   */
-  async sendChangeEmailOtp(newEmail: string, otp: string, fullName?: string): Promise<void> {
-    const mailOptions = {
-      from: `"BCN Support" <${this.configService.get<string>('EMAIL_USER')}>`,
-      to: newEmail,
-      subject: 'Xác nhận đổi email - BCN Profiles',
-      html: `
+  async sendChangeEmailOtp(
+    newEmail: string,
+    otp: string,
+    fullName?: string,
+  ): Promise<void> {
+    const html = `
         <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
           <h2>Xác nhận đổi email</h2>
           <p>Xin chào${fullName ? ` <b>${fullName}</b>` : ''},</p>
@@ -164,26 +171,29 @@ export class EmailService {
           <p>Mã có hiệu lực trong <b>15 phút</b>. Không chia sẻ mã này cho bất kỳ ai.</p>
           <p>Nếu bạn không yêu cầu đổi email, hãy bỏ qua email này.</p>
         </div>
-      `,
-    };
+      `;
 
     try {
-      await this.enqueueMail('change-email-otp', mailOptions);
+      await this.enqueueMail('change-email-otp', {
+        to: newEmail,
+        subject: 'Xác nhận đổi email - BCN Profiles',
+        html,
+      });
     } catch (error) {
-      this.logger.error('Error sending email', error instanceof Error ? error.stack : undefined);
+      this.logger.error(
+        'Error sending email',
+        error instanceof Error ? error.stack : undefined,
+      );
       throw new Error('Không thể gửi email. Vui lòng thử lại sau.');
     }
   }
 
-  /**
-   * Gửi OTP 2FA qua email
-   */
-  async sendTwoFactorOTP(email: string, otp: string, fullName?: string): Promise<void> {
-    const mailOptions = {
-      from: `"BCN Support" <${this.configService.get<string>('EMAIL_USER')}>`,
-      to: email,
-      subject: 'Mã xác nhận 2FA - BCN Profiles',
-      html: `
+  async sendTwoFactorOTP(
+    email: string,
+    otp: string,
+    fullName?: string,
+  ): Promise<void> {
+    const html = `
         <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
           <h2 style="color: #4F46E5;">Mã xác nhận 2FA</h2>
           <p>Xin chào${fullName ? ` <b>${fullName}</b>` : ''},</p>
@@ -195,26 +205,29 @@ export class EmailService {
           <p style="color: #6b7280; font-size: 12px;">Nếu bạn không yêu cầu mã này, vui lòng bỏ qua email này.</p>
           <p style="margin-top:24px;color:#6b7280;font-size:12px;">© ${new Date().getFullYear()} BCN Profiles</p>
         </div>
-      `,
-    };
+      `;
 
     try {
-      await this.enqueueMail('two-factor-otp', mailOptions);
+      await this.enqueueMail('two-factor-otp', {
+        to: email,
+        subject: 'Mã xác nhận 2FA - BCN Profiles',
+        html,
+      });
     } catch (error) {
-      this.logger.error('Error sending 2FA OTP email', error instanceof Error ? error.stack : undefined);
+      this.logger.error(
+        'Error sending 2FA OTP email',
+        error instanceof Error ? error.stack : undefined,
+      );
       throw new Error('Không thể gửi email OTP. Vui lòng thử lại sau.');
     }
   }
 
-  /**
-   * Gửi email recovery 2FA khi user mất điện thoại
-   */
-  async sendTwoFactorRecoveryEmail(email: string, recoveryCode: string, fullName?: string): Promise<void> {
-    const mailOptions = {
-      from: `"BCN Support" <${this.configService.get<string>('EMAIL_USER')}>`,
-      to: email,
-      subject: '2FA Recovery - BCN Profiles',
-      html: `
+  async sendTwoFactorRecoveryEmail(
+    email: string,
+    recoveryCode: string,
+    fullName?: string,
+  ): Promise<void> {
+    const html = `
         <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
           <h2 style="color: #dc2626;">Yêu cầu khôi phục 2FA</h2>
           <p>Xin chào${fullName ? ` <b>${fullName}</b>` : ''},</p>
@@ -230,26 +243,28 @@ export class EmailService {
           </p>
           <p style="margin-top:24px;color:#6b7280;font-size:12px;">© ${new Date().getFullYear()} BCN Profiles</p>
         </div>
-      `,
-    };
+      `;
 
     try {
-      await this.enqueueMail('two-factor-recovery-email', mailOptions);
+      await this.enqueueMail('two-factor-recovery-email', {
+        to: email,
+        subject: '2FA Recovery - BCN Profiles',
+        html,
+      });
     } catch (error) {
-      this.logger.error('Error sending 2FA recovery email', error instanceof Error ? error.stack : undefined);
+      this.logger.error(
+        'Error sending 2FA recovery email',
+        error instanceof Error ? error.stack : undefined,
+      );
       throw new Error('Không thể gửi email khôi phục. Vui lòng thử lại sau.');
     }
   }
 
-  /**
-   * Gửi email thông báo admin đã reset 2FA
-   */
-  async sendAdminResetNotification(email: string, fullName?: string): Promise<void> {
-    const mailOptions = {
-      from: `"BCN Support" <${this.configService.get<string>('EMAIL_USER')}>`,
-      to: email,
-      subject: '2FA của bạn đã được reset - BCN Profiles',
-      html: `
+  async sendAdminResetNotification(
+    email: string,
+    fullName?: string,
+  ): Promise<void> {
+    const html = `
         <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
           <h2 style="color: #4F46E5;">Thông báo: 2FA đã được reset</h2>
           <p>Xin chào${fullName ? ` <b>${fullName}</b>` : ''},</p>
@@ -263,26 +278,28 @@ export class EmailService {
             © ${new Date().getFullYear()} BCN Profiles
           </p>
         </div>
-      `,
-    };
+      `;
 
     try {
-      await this.enqueueMail('admin-reset-notification', mailOptions);
+      await this.enqueueMail('admin-reset-notification', {
+        to: email,
+        subject: '2FA của bạn đã được reset - BCN Profiles',
+        html,
+      });
     } catch (error) {
-      this.logger.error('Error sending admin reset notification', error instanceof Error ? error.stack : undefined);
+      this.logger.error(
+        'Error sending admin reset notification',
+        error instanceof Error ? error.stack : undefined,
+      );
       throw new Error('Không thể gửi email thông báo. Vui lòng thử lại sau.');
     }
   }
 
-  /**
-   * Gửi email thông báo 2FA bắt buộc
-   */
-  async sendTwoFactorEnforcedNotification(email: string, fullName?: string): Promise<void> {
-    const mailOptions = {
-      from: `"BCN Support" <${this.configService.get<string>('EMAIL_USER')}>`,
-      to: email,
-      subject: '⚠️ 2FA bắt buộc - BCN Profiles',
-      html: `
+  async sendTwoFactorEnforcedNotification(
+    email: string,
+    fullName?: string,
+  ): Promise<void> {
+    const html = `
         <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
           <h2 style="color: #EF4444;">Thông báo: 2FA bắt buộc</h2>
           <p>Xin chào${fullName ? ` <b>${fullName}</b>` : ''},</p>
@@ -303,26 +320,28 @@ export class EmailService {
             © ${new Date().getFullYear()} BCN Profiles
           </p>
         </div>
-      `,
-    };
+      `;
 
     try {
-      await this.enqueueMail('2fa-enforced-notification', mailOptions);
+      await this.enqueueMail('2fa-enforced-notification', {
+        to: email,
+        subject: '⚠️ 2FA bắt buộc - BCN Profiles',
+        html,
+      });
     } catch (error) {
-      this.logger.error('Error sending 2FA enforced notification', error instanceof Error ? error.stack : undefined);
+      this.logger.error(
+        'Error sending 2FA enforced notification',
+        error instanceof Error ? error.stack : undefined,
+      );
       throw new Error('Không thể gửi email thông báo. Vui lòng thử lại sau.');
     }
   }
 
-  /**
-   * Gửi email thông báo 2FA tùy chọn
-   */
-  async sendTwoFactorOptionalNotification(email: string, fullName?: string): Promise<void> {
-    const mailOptions = {
-      from: `"BCN Support" <${this.configService.get<string>('EMAIL_USER')}>`,
-      to: email,
-      subject: '✅ 2FA bây giờ tùy chọn - BCN Profiles',
-      html: `
+  async sendTwoFactorOptionalNotification(
+    email: string,
+    fullName?: string,
+  ): Promise<void> {
+    const html = `
         <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
           <h2 style="color: #10B981;">Thông báo: 2FA bây giờ tùy chọn</h2>
           <p>Xin chào${fullName ? ` <b>${fullName}</b>` : ''},</p>
@@ -341,13 +360,19 @@ export class EmailService {
             © ${new Date().getFullYear()} BCN Profiles
           </p>
         </div>
-      `,
-    };
+      `;
 
     try {
-      await this.enqueueMail('2fa-optional-notification', mailOptions);
+      await this.enqueueMail('2fa-optional-notification', {
+        to: email,
+        subject: '✅ 2FA bây giờ tùy chọn - BCN Profiles',
+        html,
+      });
     } catch (error) {
-      this.logger.error('Error sending 2FA optional notification', error instanceof Error ? error.stack : undefined);
+      this.logger.error(
+        'Error sending 2FA optional notification',
+        error instanceof Error ? error.stack : undefined,
+      );
       throw new Error('Không thể gửi email thông báo. Vui lòng thử lại sau.');
     }
   }

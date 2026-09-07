@@ -20,6 +20,6 @@ jobs:
               "APP_URL": "${{ secrets.APP_URL }}",
               "REDIS_URL": "${{ secrets.REDIS_URL }}",
               "REDIS_KEY_PREFIX": "bcn:profiles:",
-              "EMAIL_USER": "${{ secrets.EMAIL_USER }}",
-              "EMAIL_PASSWORD": "${{ secrets.EMAIL_PASSWORD }}"
+              "RESEND_API_KEY": "${{ secrets.RESEND_API_KEY }}",
+              "EMAIL_FROM": "${{ secrets.EMAIL_FROM }}"
             }'

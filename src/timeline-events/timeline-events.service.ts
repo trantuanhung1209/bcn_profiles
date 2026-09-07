@@ -28,7 +28,7 @@ export class TimelineEventsService implements OnModuleInit {
   }
 
   /** Warm common my-timeline pages for admins and recently active users. */
-  @Cron(CronExpression.EVERY_30_SECONDS)
+  @Cron(CronExpression.EVERY_5_MINUTES)
   async prefetchHotTimelines(): Promise<void> {
     try {
       const [admins, recentActive] = await Promise.all([
@@ -54,9 +54,9 @@ export class TimelineEventsService implements OnModuleInit {
         await Promise.all(
           batch.map(async (userId) => {
             const page = await this.queryAllByUser(userId, 1, 20);
-            this.timelineCache.setList(userId, 1, 20, page);
+            await this.timelineCache.setList(userId, 1, 20, page);
             for (const event of page) {
-              this.timelineCache.setDetail(event.id, event);
+              await this.timelineCache.setDetail(event.id, event);
             }
           }),
         );
@@ -79,26 +79,26 @@ export class TimelineEventsService implements OnModuleInit {
         metadata: createDto.metadata,
       },
     });
-    this.invalidateCaches(userId);
+    await this.invalidateCaches(userId);
     return created;
   }
 
   async findAllByUser(userId: string, page: number = 1, limit: number = 20) {
-    const cached = this.timelineCache.getList(userId, page, limit);
+    const cached = await this.timelineCache.getList(userId, page, limit);
     if (cached) {
       return cached;
     }
 
     const events = await this.queryAllByUser(userId, page, limit);
-    this.timelineCache.setList(userId, page, limit, events);
+    await this.timelineCache.setList(userId, page, limit, events);
     for (const event of events) {
-      this.timelineCache.setDetail(event.id, event);
+      await this.timelineCache.setDetail(event.id, event);
     }
     return events;
   }
 
   async findOne(id: number, requesterId?: string, requesterRole?: string) {
-    const cached = this.timelineCache.getDetail(id);
+    const cached = await this.timelineCache.getDetail(id);
     if (cached) {
       this.assertCanViewTimelineEvent(cached as { userUuid: string }, requesterId, requesterRole);
       return cached;
@@ -113,7 +113,7 @@ export class TimelineEventsService implements OnModuleInit {
     }
 
     this.assertCanViewTimelineEvent(event, requesterId, requesterRole);
-    this.timelineCache.setDetail(id, event);
+    await this.timelineCache.setDetail(id, event);
     return event;
   }
 
@@ -147,7 +147,7 @@ export class TimelineEventsService implements OnModuleInit {
       where: { id },
       data: updateDto,
     });
-    this.invalidateCaches(userId);
+    await this.invalidateCaches(userId);
     return updated;
   }
 
@@ -157,7 +157,7 @@ export class TimelineEventsService implements OnModuleInit {
     const removed = await this.prisma.timelineEvent.delete({
       where: { id },
     });
-    this.invalidateCaches(event.userUuid);
+    await this.invalidateCaches(event.userUuid);
     return removed;
   }
 
@@ -171,8 +171,8 @@ export class TimelineEventsService implements OnModuleInit {
     });
   }
 
-  private invalidateCaches(userId: string): void {
-    this.timelineCache.invalidateUser(userId);
-    this.usersListCache.invalidateAll();
+  private async invalidateCaches(userId: string): Promise<void> {
+    await this.timelineCache.invalidateUser(userId);
+    await this.usersListCache.invalidateAll();
   }
 }

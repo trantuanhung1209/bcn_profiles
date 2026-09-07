@@ -14,6 +14,7 @@ type AccessTokenPayload = {
   sub?: string;
   type?: string;
   jti?: string;
+  iat?: number;
 };
 
 @Injectable()
@@ -57,20 +58,28 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         throw new UnauthorizedException('Token đã bị thu hồi');
       }
 
+      const revokedBefore = await this.sessionCache.getRevokedBefore(userId);
+      if (
+        revokedBefore !== undefined &&
+        typeof payload.iat === 'number' &&
+        payload.iat * 1000 < revokedBefore
+      ) {
+        throw new UnauthorizedException('Phiên đăng nhập đã bị thu hồi');
+      }
+
       const user = await this.resolveUser(userId);
       if (!user) {
         throw new UnauthorizedException('Người dùng không tồn tại');
       }
 
-      const effectiveStatus = this.sessionCache.getStatusOverride(userId) ?? user.status;
-      if (effectiveStatus === 'PENDING') {
+      if (user.status === 'PENDING') {
         throw new UnauthorizedException('Tài khoản đang chờ admin phê duyệt.');
       }
-      if (effectiveStatus === 'BLOCKED') {
+      if (user.status === 'BLOCKED') {
         throw new UnauthorizedException('Tài khoản đã bị khóa. Vui lòng liên hệ admin.');
       }
 
-      return { ...user, status: effectiveStatus };
+      return user;
     } catch (error) {
       this.logger.error('JWT validation failed', error instanceof Error ? error.stack : undefined);
       throw error;
@@ -78,7 +87,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   private async resolveUser(userId: string): Promise<CachedAuthUser | null> {
-    const cached = this.sessionCache.getUser(userId);
+    const cached = await this.sessionCache.getUser(userId);
     if (cached) {
       return cached;
     }
@@ -102,7 +111,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       return null;
     }
 
-    this.sessionCache.setUser(user);
+    await this.sessionCache.setUser(user);
     return user;
   }
 }

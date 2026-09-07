@@ -26,7 +26,15 @@ export class EmailService {
         pass: this.configService.get<string>('EMAIL_PASSWORD'),
       },
       tls: {
-        rejectUnauthorized: false,
+        rejectUnauthorized: (() => {
+          const raw = this.configService
+            .get<string>('MAIL_TLS_REJECT_UNAUTHORIZED')
+            ?.trim()
+            .toLowerCase();
+          if (raw === 'false' || raw === '0') return false;
+          if (raw === 'true' || raw === '1') return true;
+          return this.configService.get<string>('NODE_ENV') === 'production';
+        })(),
       },
     } as any);
   }

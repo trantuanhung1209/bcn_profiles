@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { TtlCache } from '../common/cache/ttl-cache';
+import { RedisService } from '../redis/redis.service';
 
 export type CachedUsersPage = {
   data: unknown[];
@@ -11,22 +11,11 @@ export type CachedUsersPage = {
 
 @Injectable()
 export class UsersListCacheService {
-  private readonly pages: TtlCache<CachedUsersPage>;
-  private readonly details: TtlCache<unknown>;
-  private readonly profiles: TtlCache<unknown>;
-  private readonly byEmail: TtlCache<unknown>;
-  private readonly searches: TtlCache<unknown>;
-  private readonly counts: TtlCache<number>;
+  private readonly ttlMs: number;
 
-  constructor() {
-    const ttlMs = Number(process.env.USERS_LIST_CACHE_TTL_MS ?? 60_000);
-    const ttl = Number.isFinite(ttlMs) && ttlMs > 0 ? ttlMs : 60_000;
-    this.pages = new TtlCache<CachedUsersPage>(ttl);
-    this.details = new TtlCache<unknown>(ttl);
-    this.profiles = new TtlCache<unknown>(ttl);
-    this.byEmail = new TtlCache<unknown>(ttl);
-    this.searches = new TtlCache<unknown>(ttl);
-    this.counts = new TtlCache<number>(ttl);
+  constructor(private readonly redis: RedisService) {
+    const raw = Number(process.env.USERS_LIST_CACHE_TTL_MS ?? 60_000);
+    this.ttlMs = Number.isFinite(raw) && raw > 0 ? raw : 60_000;
   }
 
   buildPageKey(parts: {
@@ -48,60 +37,82 @@ export class UsersListCacheService {
     ].join('|');
   }
 
-  getPage(key: string): CachedUsersPage | undefined {
-    return this.pages.get(key);
+  private pageKey(key: string): string {
+    return `users:page:${key}`;
   }
 
-  setPage(key: string, value: CachedUsersPage): void {
-    this.pages.set(key, value);
+  private detailKey(id: string): string {
+    return `users:detail:${id}`;
   }
 
-  getDetail(id: string): unknown | undefined {
-    return this.details.get(id);
+  private profileKey(id: string): string {
+    return `users:profile:${id}`;
   }
 
-  setDetail(id: string, value: unknown): void {
-    this.details.set(id, value);
+  private emailKey(email: string): string {
+    return `users:email:${email.trim().toLowerCase()}`;
   }
 
-  getProfile(id: string): unknown | undefined {
-    return this.profiles.get(id);
+  private searchKey(query: string): string {
+    return `users:search:${query.trim().toLowerCase()}`;
   }
 
-  setProfile(id: string, value: unknown): void {
-    this.profiles.set(id, value);
+  private countKey(): string {
+    return 'users:count:all';
   }
 
-  getByEmail(email: string): unknown | undefined {
-    return this.byEmail.get(email.trim().toLowerCase());
+  async getPage(key: string): Promise<CachedUsersPage | undefined> {
+    return this.redis.getJson<CachedUsersPage>(this.pageKey(key));
   }
 
-  setByEmail(email: string, value: unknown): void {
-    this.byEmail.set(email.trim().toLowerCase(), value);
+  async setPage(key: string, value: CachedUsersPage): Promise<void> {
+    await this.redis.setJson(this.pageKey(key), value, this.ttlMs);
   }
 
-  getSearch(query: string): unknown | undefined {
-    return this.searches.get(query.trim().toLowerCase());
+  async getDetail(id: string): Promise<unknown | undefined> {
+    return this.redis.getJson(this.detailKey(id));
   }
 
-  setSearch(query: string, value: unknown): void {
-    this.searches.set(query.trim().toLowerCase(), value);
+  async setDetail(id: string, value: unknown): Promise<void> {
+    await this.redis.setJson(this.detailKey(id), value, this.ttlMs);
   }
 
-  getCount(): number | undefined {
-    return this.counts.get('all');
+  async getProfile(id: string): Promise<unknown | undefined> {
+    return this.redis.getJson(this.profileKey(id));
   }
 
-  setCount(value: number): void {
-    this.counts.set('all', value);
+  async setProfile(id: string, value: unknown): Promise<void> {
+    await this.redis.setJson(this.profileKey(id), value, this.ttlMs);
   }
 
-  invalidateAll(): void {
-    this.pages.clear();
-    this.details.clear();
-    this.profiles.clear();
-    this.byEmail.clear();
-    this.searches.clear();
-    this.counts.clear();
+  async getByEmail(email: string): Promise<unknown | undefined> {
+    return this.redis.getJson(this.emailKey(email));
+  }
+
+  async setByEmail(email: string, value: unknown): Promise<void> {
+    await this.redis.setJson(this.emailKey(email), value, this.ttlMs);
+  }
+
+  async getSearch(query: string): Promise<unknown | undefined> {
+    return this.redis.getJson(this.searchKey(query));
+  }
+
+  async setSearch(query: string, value: unknown): Promise<void> {
+    await this.redis.setJson(this.searchKey(query), value, this.ttlMs);
+  }
+
+  async getCount(): Promise<number | undefined> {
+    const raw = await this.redis.get(this.countKey());
+    if (raw == null) return undefined;
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : undefined;
+  }
+
+  async setCount(value: number): Promise<void> {
+    await this.redis.set(this.countKey(), String(value), this.ttlMs);
+  }
+
+  async invalidateAll(): Promise<void> {
+    await this.redis.delByPrefix('users:');
   }
 }

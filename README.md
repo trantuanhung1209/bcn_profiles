@@ -66,6 +66,7 @@ BCN Profiles được xây dựng theo kiến trúc module của NestJS, tập t
 - `@nestjs/jwt`, `passport`, `passport-jwt`, `passport-local`
 - `bcrypt` để hash password/recovery codes/OTP
 - `helmet`, `@nestjs/throttler`
+- **Redis** (`ioredis`) cho session/user/list/timeline cache + revoke hot path; key prefix `bcn:profiles:`
 
 ### Validation & Data Handling
 
@@ -101,27 +102,41 @@ prisma/
 
 ## 5) Biến môi trường
 
-Tạo file `.env` ở root:
+Tạo file `.env` từ `.env.example`:
+
+```bash
+cp .env.example .env
+```
+
+Các biến quan trọng:
 
 ```env
-# Database
 DATABASE_URL="postgresql://user:password@host:5432/database"
-
-# JWT (required, strong secret)
+REDIS_URL="redis://localhost:6379"
+REDIS_KEY_PREFIX="bcn:profiles:"
 JWT_SECRET="your-strong-jwt-secret"
-
-# Optional: dedicated key for encrypting TOTP secrets at rest
-# TOTP_ENCRYPTION_KEY="your-totp-encryption-key"
-
-# Email (OTP)
-EMAIL_HOST="smtp.gmail.com"
-EMAIL_PORT=587
+JWT_REFRESH_SECRET="your-strong-refresh-secret"
 EMAIL_USER="your-email@gmail.com"
 EMAIL_PASSWORD="your-app-password"
-
-# App
 NODE_ENV="development"
 PORT=3000
+```
+
+Redis local có thể dùng service trong `bcn_quiz/docker-compose.yml` (`docker compose up -d redis`).
+
+Sentinel / HA (optional):
+
+```bash
+cd ../bcn_quiz
+docker compose -f docker-compose.redis-sentinel.yml up -d
+```
+
+Rồi set `REDIS_SENTINELS` + `REDIS_SENTINEL_NAME=mymaster` (xem `.env.example`). Khi Sentinel được cấu hình, client bỏ qua `REDIS_URL`.
+
+Lỗi API trả về envelope thống nhất với success:
+
+```json
+{ "statusCode": 401, "message": "...", "error": "Unauthorized", "data": null }
 ```
 
 ## 6) Cài đặt và chạy dự án

@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { TtlCache } from '../../common/cache/ttl-cache';
+import { RedisService } from '../../redis/redis.service';
 
 export type CachedAuthUser = {
   id: string;
@@ -12,38 +12,65 @@ export type CachedAuthUser = {
   updatedAt: Date;
 };
 
+const USER_TTL_MS = 30_000;
+const REVOKED_BEFORE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
 @Injectable()
 export class AuthSessionCacheService {
-  /** Status/role can change; keep short so profile edits refresh reasonably fast. */
-  private readonly userCache = new TtlCache<CachedAuthUser>(30_000);
+  constructor(private readonly redis: RedisService) {}
+
+  private userKey(userId: string): string {
+    return `auth:user:${userId}`;
+  }
+
+  private revokedBeforeKey(userId: string): string {
+    return `session:revoked_before:${userId}`;
+  }
+
+  async getUser(userId: string): Promise<CachedAuthUser | undefined> {
+    const raw = await this.redis.getJson<{
+      id: string;
+      email: string;
+      fullName: string | null;
+      avatar: string | null;
+      role: string;
+      status: string;
+      createdAt: string;
+      updatedAt: string;
+    }>(this.userKey(userId));
+
+    if (!raw) return undefined;
+
+    return {
+      ...raw,
+      createdAt: new Date(raw.createdAt),
+      updatedAt: new Date(raw.updatedAt),
+    };
+  }
+
+  async setUser(user: CachedAuthUser): Promise<void> {
+    await this.redis.setJson(this.userKey(user.id), user, USER_TTL_MS);
+  }
+
+  async invalidateUser(userId: string): Promise<void> {
+    await this.redis.del(this.userKey(userId));
+  }
 
   /**
-   * Admin status changes must win over JWT claims even before access token expires.
-   * Kept for a long TTL (or until overwritten).
+   * Kill all sessions issued before now (checked against JWT `iat`).
    */
-  private readonly statusOverrides = new TtlCache<string>(24 * 60 * 60 * 1000);
-
-  getUser(userId: string): CachedAuthUser | undefined {
-    return this.userCache.get(userId);
+  async setRevokedBefore(userId: string, atMs: number = Date.now()): Promise<void> {
+    await this.redis.set(
+      this.revokedBeforeKey(userId),
+      String(atMs),
+      REVOKED_BEFORE_TTL_MS,
+    );
   }
 
-  setUser(user: CachedAuthUser): void {
-    this.userCache.set(user.id, user);
-  }
-
-  invalidateUser(userId: string): void {
-    this.userCache.delete(userId);
-  }
-
-  setStatusOverride(userId: string, status: string): void {
-    this.statusOverrides.set(userId, status);
-    const cached = this.userCache.get(userId);
-    if (cached) {
-      this.userCache.set(userId, { ...cached, status });
-    }
-  }
-
-  getStatusOverride(userId: string): string | undefined {
-    return this.statusOverrides.get(userId);
+  async getRevokedBefore(userId: string): Promise<number | undefined> {
+    const raw = await this.redis.get(this.revokedBeforeKey(userId));
+    if (raw == null) return undefined;
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : undefined;
   }
 }

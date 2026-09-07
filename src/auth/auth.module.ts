@@ -2,7 +2,6 @@ import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { ThrottlerModule } from '@nestjs/throttler';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { PrismaModule } from '../prisma/prisma.module';
@@ -22,7 +21,6 @@ import { TwoFactorRecoveryGuard } from './guards/two-factor-recovery.guard';
   imports: [
     PrismaModule,
     PassportModule,
-    ThrottlerModule.forRoot([{ ttl: 60000, limit: 50 }]),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => {

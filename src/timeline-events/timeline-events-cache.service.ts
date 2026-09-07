@@ -1,46 +1,57 @@
 import { Injectable } from '@nestjs/common';
-import { TtlCache } from '../common/cache/ttl-cache';
+import { RedisService } from '../redis/redis.service';
 
 @Injectable()
 export class TimelineEventsCacheService {
-  private readonly lists: TtlCache<unknown[]>;
-  private readonly details: TtlCache<unknown>;
+  private readonly ttlMs: number;
 
-  constructor() {
-    const ttlMs = Number(process.env.TIMELINE_CACHE_TTL_MS ?? 60_000);
-    const ttl = Number.isFinite(ttlMs) && ttlMs > 0 ? ttlMs : 60_000;
-    this.lists = new TtlCache<unknown[]>(ttl);
-    this.details = new TtlCache<unknown>(ttl);
+  constructor(private readonly redis: RedisService) {
+    const raw = Number(process.env.TIMELINE_CACHE_TTL_MS ?? 60_000);
+    this.ttlMs = Number.isFinite(raw) && raw > 0 ? raw : 60_000;
   }
 
   buildListKey(userId: string, page: number, limit: number): string {
     return `${userId}|${page}|${limit}`;
   }
 
-  getList(userId: string, page: number, limit: number): unknown[] | undefined {
-    return this.lists.get(this.buildListKey(userId, page, limit));
+  private listKey(userId: string, page: number, limit: number): string {
+    return `timeline:list:${this.buildListKey(userId, page, limit)}`;
   }
 
-  setList(userId: string, page: number, limit: number, value: unknown[]): void {
-    this.lists.set(this.buildListKey(userId, page, limit), value);
+  private detailKey(id: number): string {
+    return `timeline:detail:${id}`;
   }
 
-  getDetail(id: number): unknown | undefined {
-    return this.details.get(String(id));
+  async getList(
+    userId: string,
+    page: number,
+    limit: number,
+  ): Promise<unknown[] | undefined> {
+    return this.redis.getJson<unknown[]>(this.listKey(userId, page, limit));
   }
 
-  setDetail(id: number, value: unknown): void {
-    this.details.set(String(id), value);
+  async setList(
+    userId: string,
+    page: number,
+    limit: number,
+    value: unknown[],
+  ): Promise<void> {
+    await this.redis.setJson(this.listKey(userId, page, limit), value, this.ttlMs);
   }
 
-  invalidateAll(): void {
-    this.lists.clear();
-    this.details.clear();
+  async getDetail(id: number): Promise<unknown | undefined> {
+    return this.redis.getJson(this.detailKey(id));
   }
 
-  invalidateUser(userId: string): void {
-    // TtlCache has no prefix delete; clear lists entirely (small cache).
-    this.lists.clear();
-    this.details.clear();
+  async setDetail(id: number, value: unknown): Promise<void> {
+    await this.redis.setJson(this.detailKey(id), value, this.ttlMs);
+  }
+
+  async invalidateAll(): Promise<void> {
+    await this.redis.delByPrefix('timeline:');
+  }
+
+  async invalidateUser(_userId: string): Promise<void> {
+    await this.invalidateAll();
   }
 }

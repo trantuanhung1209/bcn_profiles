@@ -82,7 +82,7 @@ export class UsersService implements OnModuleInit {
   }
 
   /** Keep common admin read endpoints warm so the first browser hit is a cache hit. */
-  @Cron(CronExpression.EVERY_30_SECONDS)
+  @Cron(CronExpression.EVERY_5_MINUTES)
   async prefetchHotUserLists(): Promise<void> {
     try {
       // Match QueryUsersDto defaults (sort=createdAt, order=desc) plus common UI sorts.
@@ -109,13 +109,13 @@ export class UsersService implements OnModuleInit {
             query.scope === 'pending'
               ? await this.queryPendingPage(query.page, query.limit, query.sort, query.order)
               : await this.queryAllPage(query.page, query.limit, query.sort, query.order);
-          this.listCache.setPage(this.listCache.buildPageKey({ ...query }), result);
+          await this.listCache.setPage(this.listCache.buildPageKey({ ...query }), result);
           return { query, result };
         }),
       );
 
       const count = await this.queryCount();
-      this.listCache.setCount(count);
+      await this.listCache.setCount(count);
 
       // Warm details/profiles for likely first-click rows + admins (often opened immediately).
       const userIds = new Set<string>();
@@ -145,11 +145,11 @@ export class UsersService implements OnModuleInit {
           this.queryPublicProfile(id),
         ]);
         if (detail) {
-          this.listCache.setDetail(id, detail);
-          this.listCache.setByEmail(detail.email, detail);
+          await this.listCache.setDetail(id, detail);
+          await this.listCache.setByEmail(detail.email, detail);
         }
         if (profile) {
-          this.listCache.setProfile(id, profile);
+          await this.listCache.setProfile(id, profile);
         }
       }
 
@@ -178,13 +178,13 @@ export class UsersService implements OnModuleInit {
       order,
       search,
     });
-    const cached = this.listCache.getPage(cacheKey);
+    const cached = await this.listCache.getPage(cacheKey);
     if (cached) {
       return cached as PaginatedUsers;
     }
 
     const result = await this.queryPendingPage(page, limit, sort, order, search);
-    this.listCache.setPage(cacheKey, result);
+    await this.listCache.setPage(cacheKey, result);
     return result;
   }
 
@@ -203,13 +203,13 @@ export class UsersService implements OnModuleInit {
       order,
       search,
     });
-    const cached = this.listCache.getPage(cacheKey);
+    const cached = await this.listCache.getPage(cacheKey);
     if (cached) {
       return cached as PaginatedUsers;
     }
 
     const result = await this.queryAllPage(page, limit, sort, order, search);
-    this.listCache.setPage(cacheKey, result);
+    await this.listCache.setPage(cacheKey, result);
     return result;
   }
 
@@ -290,12 +290,12 @@ export class UsersService implements OnModuleInit {
     };
   }
 
-  private invalidateListCaches(): void {
-    this.listCache.invalidateAll();
+  private async invalidateListCaches(): Promise<void> {
+    await this.listCache.invalidateAll();
   }
 
   async findOne(id: string): Promise<UserWithoutPassword> {
-    const cached = this.listCache.getDetail(id);
+    const cached = await this.listCache.getDetail(id);
     if (cached) {
       return cached as UserWithoutPassword;
     }
@@ -305,13 +305,13 @@ export class UsersService implements OnModuleInit {
       throw new NotFoundException(`User với ID ${id} không tồn tại`);
     }
 
-    this.listCache.setDetail(id, user);
-    this.listCache.setByEmail(user.email, user);
+    await this.listCache.setDetail(id, user);
+    await this.listCache.setByEmail(user.email, user);
     return user;
   }
 
   async getPublicProfile(id: string) {
-    const cached = this.listCache.getProfile(id);
+    const cached = await this.listCache.getProfile(id);
     if (cached) {
       return cached;
     }
@@ -321,12 +321,12 @@ export class UsersService implements OnModuleInit {
       throw new NotFoundException(`User với ID ${id} không tồn tại`);
     }
 
-    this.listCache.setProfile(id, user);
+    await this.listCache.setProfile(id, user);
     return user;
   }
 
   async findByEmail(email: string): Promise<UserWithoutPassword | null> {
-    const cached = this.listCache.getByEmail(email);
+    const cached = await this.listCache.getByEmail(email);
     if (cached !== undefined) {
       return cached as UserWithoutPassword | null;
     }
@@ -350,22 +350,22 @@ export class UsersService implements OnModuleInit {
       },
     });
 
-    this.listCache.setByEmail(email, user);
+    await this.listCache.setByEmail(email, user);
     if (user) {
       // Detail cache may be richer later; email lookup still benefits immediately.
-      this.listCache.setDetail(user.id, user);
+      await this.listCache.setDetail(user.id, user);
     }
     return user;
   }
 
   async countUsers(): Promise<number> {
-    const cached = this.listCache.getCount();
+    const cached = await this.listCache.getCount();
     if (cached !== undefined) {
       return cached;
     }
 
     const count = await this.queryCount();
-    this.listCache.setCount(count);
+    await this.listCache.setCount(count);
     return count;
   }
 
@@ -485,7 +485,7 @@ export class UsersService implements OnModuleInit {
       }),
     );
 
-    this.invalidateListCaches();
+    await this.invalidateListCaches();
     return newUser;
   }
 
@@ -499,9 +499,8 @@ export class UsersService implements OnModuleInit {
     }
 
     await this.prisma.user.delete({ where: { id } });
-    this.sessionCache.invalidateUser(id);
-    this.sessionCache.setStatusOverride(id, 'BLOCKED');
-    this.invalidateListCaches();
+    await this.sessionCache.invalidateUser(id);
+    await this.invalidateListCaches();
 
     void this.emailService.sendRejectionEmail(user.email, user.fullName || undefined).catch((error) => {
       this.logger.error('Failed to send rejection email in background', error instanceof Error ? error.stack : undefined);
@@ -512,6 +511,9 @@ export class UsersService implements OnModuleInit {
     const user = await this.prisma.user.findUnique({ where: { id } });
     if (!user) {
       throw new NotFoundException(`User với ID ${id} không tồn tại`);
+    }
+    if (user.status !== 'PENDING') {
+      throw new ConflictException('Chỉ có thể duyệt tài khoản đang chờ duyệt');
     }
 
     const updatedUser = await this.prisma.user.update({
@@ -534,9 +536,8 @@ export class UsersService implements OnModuleInit {
       },
     });
 
-    this.sessionCache.invalidateUser(id);
-    this.sessionCache.setStatusOverride(id, 'ACTIVE');
-    this.invalidateListCaches();
+    await this.sessionCache.invalidateUser(id);
+    await this.invalidateListCaches();
 
     void this.emailService.sendApprovalEmail(user.email, user.fullName || undefined).catch((error) => {
       // Không rollback nếu gửi email lỗi — tài khoản vẫn được duyệt
@@ -572,9 +573,9 @@ export class UsersService implements OnModuleInit {
       },
     });
 
-    this.sessionCache.invalidateUser(id);
-    this.sessionCache.setStatusOverride(id, 'BLOCKED');
-    this.invalidateListCaches();
+    await this.sessionCache.invalidateUser(id);
+    await this.sessionCache.setRevokedBefore(id);
+    await this.invalidateListCaches();
     return updatedUser;
   }
 
@@ -604,9 +605,8 @@ export class UsersService implements OnModuleInit {
       },
     });
 
-    this.sessionCache.invalidateUser(id);
-    this.sessionCache.setStatusOverride(id, 'ACTIVE');
-    this.invalidateListCaches();
+    await this.sessionCache.invalidateUser(id);
+    await this.invalidateListCaches();
     return updatedUser;
   }
 
@@ -629,8 +629,8 @@ export class UsersService implements OnModuleInit {
     await this.prisma.user.delete({
       where: { id },
     });
-    this.sessionCache.invalidateUser(id);
-    this.invalidateListCaches();
+    await this.sessionCache.invalidateUser(id);
+    await this.invalidateListCaches();
   }
 
   async updateUser(
@@ -679,8 +679,8 @@ export class UsersService implements OnModuleInit {
       },
     });
 
-    this.sessionCache.invalidateUser(id);
-    this.invalidateListCaches();
+    await this.sessionCache.invalidateUser(id);
+    await this.invalidateListCaches();
     return updatedUser;
   }
 
@@ -690,7 +690,7 @@ export class UsersService implements OnModuleInit {
     const normalizedQuery = query?.trim();
     if (!normalizedQuery) return [];
 
-    const cached = this.listCache.getSearch(normalizedQuery);
+    const cached = await this.listCache.getSearch(normalizedQuery);
     if (cached) {
       return cached as { id: string; fullName: string | null; avatar: string | null }[];
     }
@@ -705,7 +705,7 @@ export class UsersService implements OnModuleInit {
       take: 20,
     });
 
-    this.listCache.setSearch(normalizedQuery, results);
+    await this.listCache.setSearch(normalizedQuery, results);
     return results;
   }
 }

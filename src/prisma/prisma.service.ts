@@ -69,7 +69,9 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
 
   generateUserId(): string {
     const yearSuffix = new Date().getFullYear().toString().slice(-2);
-    const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+    const random = Math.floor(Math.random() * 100_000_000)
+      .toString()
+      .padStart(8, '0');
     return `${yearSuffix}${random}`;
   }
 

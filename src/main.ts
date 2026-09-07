@@ -52,27 +52,37 @@ async function bootstrap() {
   );
   app.useGlobalInterceptors(app.get(RequestLoggingInterceptor), new ResponseInterceptor());
 
-  const isProduction = process.env.NODE_ENV === 'production';
+  const envOrigins = (process.env.CORS_ORIGINS ?? '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+  // React (Vite :5173), Next.js (:3000/:3001), uside.id.vn + extras via CORS_ORIGINS
+  const allowedOrigins: (string | RegExp)[] = [
+    /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/,
+    /^https?:\/\/(.*\.)?uside\.id\.vn$/,
+    /^https?:\/\/(.*\.)?uside\.studio$/,
+    /^https:\/\/.+\.vercel\.app$/,
+    'https://profiles-uside-studio.vercel.app',
+    'https://quizzes-uside-studio.vercel.app',
+    ...envOrigins,
+  ];
 
   app.enableCors({
-    origin: isProduction
-      ? [
-          /^https:\/\/[^.]+\.uside\.studio$/,
-          /^https:\/\/[^.]+\.uside\.id\.vn$/,
-          /^https:\/\/.+\.vercel\.app$/,
-          'https://profiles-uside-studio.vercel.app',
-          'https://quizzes-uside-studio.vercel.app',
-          'http://profiles.uside.id.vn',
-          'https://profiles.uside.id.vn',
-        ]
-      : (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
-          // Cho phép tất cả localhost và 127.0.0.1 ở mọi port khi development
-          if (!origin || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
-            callback(null, true);
-          } else {
-            callback(new Error(`CORS blocked: ${origin}`));
-          }
-        },
+    origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+      if (!origin) {
+        callback(null, true);
+        return;
+      }
+      const allowed = allowedOrigins.some((rule) =>
+        typeof rule === 'string' ? rule === origin : rule.test(origin),
+      );
+      if (allowed) {
+        callback(null, true);
+        return;
+      }
+      callback(new Error(`CORS blocked: ${origin}`));
+    },
     credentials: true,
   });
   

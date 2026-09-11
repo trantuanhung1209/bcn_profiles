@@ -45,7 +45,9 @@ export class TimelineEventsService implements OnModuleInit {
         }),
       ]);
 
-      const userIds = [...new Set([...admins, ...recentActive].map((user) => user.id))];
+      const userIds = [
+        ...new Set([...admins, ...recentActive].map((user) => user.id)),
+      ];
 
       // Small concurrency to warm cache without saturating the remote DB pool.
       const batchSize = 5;
@@ -100,7 +102,11 @@ export class TimelineEventsService implements OnModuleInit {
   async findOne(id: number, requesterId?: string, requesterRole?: string) {
     const cached = await this.timelineCache.getDetail(id);
     if (cached) {
-      this.assertCanViewTimelineEvent(cached as { userUuid: string }, requesterId, requesterRole);
+      this.assertCanViewTimelineEvent(
+        cached as { userUuid: string },
+        requesterId,
+        requesterRole,
+      );
       return cached;
     }
 
@@ -126,16 +132,14 @@ export class TimelineEventsService implements OnModuleInit {
       return;
     }
     if (event.userUuid !== requesterId && requesterRole !== Role.ADMIN) {
-      throw new ForbiddenException('You can only view your own timeline events');
+      throw new ForbiddenException(
+        'You can only view your own timeline events',
+      );
     }
   }
 
-  async update(
-    id: number,
-    userId: string,
-    updateDto: UpdateTimelineEventDto,
-  ) {
-    const event = await this.findOne(id, userId) as { userUuid: string };
+  async update(id: number, userId: string, updateDto: UpdateTimelineEventDto) {
+    const event = (await this.findOne(id, userId)) as { userUuid: string };
 
     if (event.userUuid !== userId) {
       throw new ForbiddenException(
@@ -152,7 +156,7 @@ export class TimelineEventsService implements OnModuleInit {
   }
 
   async remove(id: number) {
-    const event = await this.findOne(id) as { userUuid: string; id: number };
+    const event = (await this.findOne(id)) as { userUuid: string; id: number };
 
     const removed = await this.prisma.timelineEvent.delete({
       where: { id },

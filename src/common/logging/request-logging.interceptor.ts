@@ -42,11 +42,24 @@ export class RequestLoggingInterceptor implements NestInterceptor {
 
     return next.handle().pipe(
       tap(() => {
-        this.logRequest(request, method, url, response.statusCode, Date.now() - startedAt);
+        this.logRequest(
+          request,
+          method,
+          url,
+          response.statusCode,
+          Date.now() - startedAt,
+        );
       }),
       catchError((error: unknown) => {
         const status = this.extractStatusCode(error, response.statusCode);
-        this.logRequest(request, method, url, status, Date.now() - startedAt, error);
+        this.logRequest(
+          request,
+          method,
+          url,
+          status,
+          Date.now() - startedAt,
+          error,
+        );
         return throwError(() => error);
       }),
     );
@@ -61,7 +74,8 @@ export class RequestLoggingInterceptor implements NestInterceptor {
     error?: unknown,
   ): void {
     const level = status >= 500 ? 'error' : status >= 400 ? 'warn' : 'info';
-    const message = error instanceof Error ? error.message : 'request_completed';
+    const message =
+      error instanceof Error ? error.message : 'request_completed';
 
     this.logger.log(level, message, {
       user_id: this.extractUserId(request.user),

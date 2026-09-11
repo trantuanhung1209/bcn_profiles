@@ -1,4 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { PrismaService } from './prisma/prisma.service';
 
 @Injectable()
@@ -17,20 +21,19 @@ export class AppService {
       // Thử thực hiện một query đơn giản để kiểm tra kết nối
       await this.prisma.$queryRaw`SELECT 1`;
       return {
-        status: 'success',
+        status: 'UP',
         message: 'Đã kết nối với Prisma và database thành công!',
         timestamp: new Date().toISOString(),
-        database: 'connected'
+        database: 'connected',
       };
     } catch (error) {
       this.logger.error('Database connection failed:', error);
-      return {
-        status: 'error',
+      throw new ServiceUnavailableException({
+        status: 'DOWN',
         message: 'Không thể kết nối với database',
         timestamp: new Date().toISOString(),
         database: 'disconnected',
-        error: error instanceof Error ? error.message : 'Unknown error'
-      };
+      });
     }
   }
 }

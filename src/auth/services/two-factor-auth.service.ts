@@ -23,7 +23,9 @@ export class TwoFactorAuthService {
     private readonly challengeService: AuthChallengeService,
   ) {}
 
-  async generateTOTPSecret(email: string): Promise<{ secret: string; qrCode: string }> {
+  async generateTOTPSecret(
+    email: string,
+  ): Promise<{ secret: string; qrCode: string }> {
     const secret = speakeasy.generateSecret({
       name: `BCN Profiles (${email})`,
       issuer: 'BCN Profiles',
@@ -65,7 +67,10 @@ export class TwoFactorAuthService {
     return Promise.all(codes.map((code) => bcrypt.hash(code, 10)));
   }
 
-  async verifyBackupCode(plainCode: string, hashedCode: string): Promise<boolean> {
+  async verifyBackupCode(
+    plainCode: string,
+    hashedCode: string,
+  ): Promise<boolean> {
     return bcrypt.compare(plainCode, hashedCode);
   }
 
@@ -76,7 +81,9 @@ export class TwoFactorAuthService {
     });
 
     const existingMetadata =
-      existing?.metadata && typeof existing.metadata === 'object' && !Array.isArray(existing.metadata)
+      existing?.metadata &&
+      typeof existing.metadata === 'object' &&
+      !Array.isArray(existing.metadata)
         ? (existing.metadata as Record<string, unknown>)
         : {};
 
@@ -100,7 +107,9 @@ export class TwoFactorAuthService {
     });
 
     const existingMetadata =
-      existing?.metadata && typeof existing.metadata === 'object' && !Array.isArray(existing.metadata)
+      existing?.metadata &&
+      typeof existing.metadata === 'object' &&
+      !Array.isArray(existing.metadata)
         ? (existing.metadata as Record<string, unknown>)
         : {};
 
@@ -117,7 +126,9 @@ export class TwoFactorAuthService {
           },
         },
       }),
-      this.prismaService.twoFactorRecoveryCode.deleteMany({ where: { userId } }),
+      this.prismaService.twoFactorRecoveryCode.deleteMany({
+        where: { userId },
+      }),
       this.prismaService.authChallenge.deleteMany({
         where: {
           userId,
@@ -136,20 +147,27 @@ export class TwoFactorAuthService {
     return codes.map((c) => c.code);
   }
 
-  async markBackupCodeAsUsed(userId: string, plainCode: string): Promise<boolean> {
-    const unusedCodes = await this.prismaService.twoFactorRecoveryCode.findMany({
-      where: { userId, isUsed: false },
-      select: { id: true, code: true },
-    });
+  async markBackupCodeAsUsed(
+    userId: string,
+    plainCode: string,
+  ): Promise<boolean> {
+    const unusedCodes = await this.prismaService.twoFactorRecoveryCode.findMany(
+      {
+        where: { userId, isUsed: false },
+        select: { id: true, code: true },
+      },
+    );
 
     for (const codeRecord of unusedCodes) {
       const isMatch = await this.verifyBackupCode(plainCode, codeRecord.code);
       if (!isMatch) continue;
 
-      const updated = await this.prismaService.twoFactorRecoveryCode.updateMany({
-        where: { id: codeRecord.id, isUsed: false },
-        data: { isUsed: true, usedAt: new Date() },
-      });
+      const updated = await this.prismaService.twoFactorRecoveryCode.updateMany(
+        {
+          where: { id: codeRecord.id, isUsed: false },
+          data: { isUsed: true, usedAt: new Date() },
+        },
+      );
       return updated.count === 1;
     }
 
@@ -239,7 +257,13 @@ export class TwoFactorAuthService {
     email: string,
     secret: string,
   ): Promise<string> {
-    return this.challengeService.issue('setup-2fa', userId, email, 15 * 60, secret);
+    return this.challengeService.issue(
+      'setup-2fa',
+      userId,
+      email,
+      15 * 60,
+      secret,
+    );
   }
 
   generateVerificationToken(userId: string, email: string): Promise<string> {
@@ -340,7 +364,11 @@ export class TwoFactorAuthService {
     }
 
     const { secret, qrCode } = await this.generateTOTPSecret(email);
-    const setupToken = await this.generateSetupTokenWithSecret(userId, email, secret);
+    const setupToken = await this.generateSetupTokenWithSecret(
+      userId,
+      email,
+      secret,
+    );
     return { secret, qrCode, setupToken };
   }
 
@@ -351,7 +379,9 @@ export class TwoFactorAuthService {
   ): Promise<{ backupCodes: string[] }> {
     const isCodeValid = await this.verifyTOTPCode(totpSecret, totpCode);
     if (!isCodeValid) {
-      throw new UnauthorizedException('Mã TOTP không chính xác. Vui lòng thử lại.');
+      throw new UnauthorizedException(
+        'Mã TOTP không chính xác. Vui lòng thử lại.',
+      );
     }
 
     const backupCodes = await this.generateBackupCodes(10);
@@ -360,7 +390,11 @@ export class TwoFactorAuthService {
     return { backupCodes };
   }
 
-  async userDisable2FA(userId: string, password: string, totpCode: string): Promise<void> {
+  async userDisable2FA(
+    userId: string,
+    password: string,
+    totpCode: string,
+  ): Promise<void> {
     const isPasswordValid = await this.validatePassword(userId, password);
     if (!isPasswordValid) {
       throw new UnauthorizedException('Mật khẩu không chính xác');

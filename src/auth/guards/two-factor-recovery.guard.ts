@@ -1,4 +1,9 @@
-import { Injectable, CanActivate, ExecutionContext, UnauthorizedException } from '@nestjs/common';
+import {
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { AuthChallengeService } from '../services/auth-challenge.service';
 
 @Injectable()
@@ -18,7 +23,10 @@ export class TwoFactorRecoveryGuard implements CanActivate {
       throw new UnauthorizedException('Recovery token is missing');
     }
 
-    const challenge = await this.challengeService.validate(token, 'recovery-2fa');
+    const challenge = await this.challengeService.validate(
+      token,
+      'recovery-2fa',
+    );
     request.user = {
       userId: challenge.userId,
       email: challenge.email,

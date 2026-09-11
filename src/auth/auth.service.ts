@@ -1,4 +1,11 @@
-import { Injectable, UnauthorizedException, ConflictException, BadRequestException, NotFoundException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  UnauthorizedException,
+  ConflictException,
+  BadRequestException,
+  NotFoundException,
+  Logger,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
@@ -39,6 +46,7 @@ type JwtTokenPayload = {
   updatedAt: string;
   type: 'access' | 'refresh';
   jti: string;
+  iat?: number;
   exp?: number;
 };
 
@@ -82,18 +90,27 @@ export class AuthService {
       },
     });
 
-    if (!user || !user.password || !await bcrypt.compare(password, user.password)) {
+    if (
+      !user ||
+      !user.password ||
+      !(await bcrypt.compare(password, user.password))
+    ) {
       return null;
     }
 
     if (user.status === 'PENDING') {
-      throw new UnauthorizedException('Tài khoản đang chờ admin phê duyệt. Vui lòng chờ thông báo qua email.');
+      throw new UnauthorizedException(
+        'Tài khoản đang chờ admin phê duyệt. Vui lòng chờ thông báo qua email.',
+      );
     }
     if (user.status === 'BLOCKED') {
-      throw new UnauthorizedException('Tài khoản đã bị khóa. Vui lòng liên hệ admin.');
+      throw new UnauthorizedException(
+        'Tài khoản đã bị khóa. Vui lòng liên hệ admin.',
+      );
     }
 
-    const { password: _, ...result } = user;
+    const { password: passwordHash, ...result } = user;
+    void passwordHash;
     return result;
   }
 
@@ -142,7 +159,8 @@ export class AuthService {
     );
 
     return {
-      message: 'Đăng ký thành công. Tài khoản đang chờ admin phê duyệt, bạn sẽ nhận được email thông báo khi được duyệt.',
+      message:
+        'Đăng ký thành công. Tài khoản đang chờ admin phê duyệt, bạn sẽ nhận được email thông báo khi được duyệt.',
       user,
     };
   }
@@ -164,10 +182,11 @@ export class AuthService {
     }
 
     if (twoFactorEnabled) {
-      const verificationToken = await this.twoFactorAuthService.generateVerificationToken(
-        user.id,
-        user.email,
-      );
+      const verificationToken =
+        await this.twoFactorAuthService.generateVerificationToken(
+          user.id,
+          user.email,
+        );
       return {
         requiresTwoFactorVerification: true,
         verificationToken,
@@ -225,9 +244,9 @@ export class AuthService {
 
   async refreshTokens(refreshToken: string) {
     try {
-      const payload = this.jwtService.verify(refreshToken, {
+      const payload = this.jwtService.verify<JwtTokenPayload>(refreshToken, {
         secret: this.refreshSecret,
-      }) as Partial<JwtTokenPayload> & { iat?: number };
+      });
 
       if (payload.type !== 'refresh' || !payload.sub || !payload.jti) {
         throw new UnauthorizedException('Refresh token không hợp lệ');
@@ -237,7 +256,9 @@ export class AuthService {
         throw new UnauthorizedException('Refresh token đã bị thu hồi');
       }
 
-      const revokedBefore = await this.sessionCache.getRevokedBefore(payload.sub);
+      const revokedBefore = await this.sessionCache.getRevokedBefore(
+        payload.sub,
+      );
       if (
         revokedBefore !== undefined &&
         typeof payload.iat === 'number' &&
@@ -283,7 +304,10 @@ export class AuthService {
     }
   }
 
-  async revokeTokenPair(accessToken?: string, refreshToken?: string): Promise<void> {
+  async revokeTokenPair(
+    accessToken?: string,
+    refreshToken?: string,
+  ): Promise<void> {
     await Promise.all([
       this.revokeIfPresent(accessToken, 'access'),
       this.revokeIfPresent(refreshToken, 'refresh'),
@@ -300,15 +324,18 @@ export class AuthService {
         kind === 'refresh'
           ? this.refreshSecret
           : this.configService.get<string>('JWT_SECRET')?.trim();
-      const payload = this.jwtService.verify(token, {
+      const payload = this.jwtService.verify<JwtTokenPayload>(token, {
         ignoreExpiration: true,
         secret,
-      }) as Partial<JwtTokenPayload>;
+      });
       if (!payload.jti) return;
       const expMs = payload.exp
         ? payload.exp * 1000
         : Date.now() + 60 * 60 * 1000;
-      await this.tokenRevocation.revoke(payload.jti, new Date(Math.max(expMs, Date.now())));
+      await this.tokenRevocation.revoke(
+        payload.jti,
+        new Date(Math.max(expMs, Date.now())),
+      );
     } catch {
       // Ignore malformed cookies on logout.
     }
@@ -381,9 +408,14 @@ export class AuthService {
       },
     });
 
-    void this.emailService.sendChangeEmailOtp(newEmail, otp, currentUser.fullName || undefined).catch((error) => {
-      this.logger.error('Failed to send change-email OTP in background', error instanceof Error ? error.stack : undefined);
-    });
+    void this.emailService
+      .sendChangeEmailOtp(newEmail, otp, currentUser.fullName || undefined)
+      .catch((error) => {
+        this.logger.error(
+          'Failed to send change-email OTP in background',
+          error instanceof Error ? error.stack : undefined,
+        );
+      });
 
     return {
       message: `Mã OTP đang được gửi đến ${newEmail}. Vui lòng kiểm tra hộp thư.`,
@@ -453,7 +485,9 @@ export class AuthService {
       throw new UnauthorizedException('Tài khoản đang chờ admin phê duyệt.');
     }
     if (status === 'BLOCKED') {
-      throw new UnauthorizedException('Tài khoản đã bị khóa. Vui lòng liên hệ admin.');
+      throw new UnauthorizedException(
+        'Tài khoản đã bị khóa. Vui lòng liên hệ admin.',
+      );
     }
   }
 
@@ -475,7 +509,8 @@ export class AuthService {
 
     // Luôn trả về response thành công dù email có tồn tại hay không
     const genericResponse = {
-      message: 'Nếu email tồn tại trong hệ thống, mã OTP sẽ được gửi đến hộp thư của bạn.',
+      message:
+        'Nếu email tồn tại trong hệ thống, mã OTP sẽ được gửi đến hộp thư của bạn.',
       expiresIn: '15 phút',
     };
 
@@ -506,9 +541,14 @@ export class AuthService {
       },
     });
 
-    void this.emailService.sendResetPasswordEmail(email, otp, user.fullName || undefined).catch((error) => {
-      this.logger.error('Failed to send reset-password OTP in background', error instanceof Error ? error.stack : undefined);
-    });
+    void this.emailService
+      .sendResetPasswordEmail(email, otp, user.fullName || undefined)
+      .catch((error) => {
+        this.logger.error(
+          'Failed to send reset-password OTP in background',
+          error instanceof Error ? error.stack : undefined,
+        );
+      });
 
     return genericResponse;
   }
@@ -571,7 +611,8 @@ export class AuthService {
     await this.sessionCache.invalidateUser(user.id);
 
     return {
-      message: 'Đặt lại mật khẩu thành công. Bạn có thể đăng nhập với mật khẩu mới.',
+      message:
+        'Đặt lại mật khẩu thành công. Bạn có thể đăng nhập với mật khẩu mới.',
     };
   }
 

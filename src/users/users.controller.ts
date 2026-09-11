@@ -1,9 +1,21 @@
-import { Body, Controller, Delete, ForbiddenException, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  ForbiddenException,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { UsersService } from './users.service';
 import type { SortableUserFields, SortOrder } from './users.service';
 import { QueryUsersDto } from './dto/query-users.dto';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { CreateAvatarUploadSignatureDto } from './dto/create-avatar-upload-signature.dto';
+import { SetAvatarDto } from './dto/set-avatar.dto';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Role } from '../auth/enums/role.enum';
 import { User } from '../auth/decorators/user.decorator';
@@ -85,10 +97,36 @@ export class UsersController {
     @Body() updateData: UpdateUserDto,
     @User() currentUser: any,
   ) {
-    const updatedUser = await this.usersService.updateUser(currentUser.id, updateData);
+    const updatedUser = await this.usersService.updateUser(
+      currentUser.id,
+      updateData,
+    );
     return {
       users: updatedUser,
     };
+  }
+
+  @Post('me/avatar/upload-signature')
+  @Roles(Role.USER, Role.ADMIN)
+  async createAvatarUploadSignature(
+    @Body() dto: CreateAvatarUploadSignatureDto,
+    @User() currentUser: any,
+  ) {
+    return this.usersService.createAvatarUploadSignature(currentUser.id, dto);
+  }
+
+  @Patch('me/avatar')
+  @Roles(Role.USER, Role.ADMIN)
+  async setAvatar(@Body() dto: SetAvatarDto, @User() currentUser: any) {
+    const user = await this.usersService.setAvatar(currentUser.id, dto);
+    return { users: user };
+  }
+
+  @Delete('me/avatar')
+  @Roles(Role.USER, Role.ADMIN)
+  async clearAvatar(@User() currentUser: any) {
+    const user = await this.usersService.clearAvatar(currentUser.id);
+    return { users: user };
   }
 
   @Get(':id/profile')
@@ -128,7 +166,9 @@ export class UsersController {
   @Roles(Role.ADMIN)
   async blockUser(@Param('id') id: string, @User() currentUser: any) {
     if (currentUser.id === id) {
-      throw new ForbiddenException('Bạn không thể tự khóa tài khoản của chính mình');
+      throw new ForbiddenException(
+        'Bạn không thể tự khóa tài khoản của chính mình',
+      );
     }
     const user = await this.usersService.blockUser(id);
     return { message: 'Tài khoản đã bị khóa', user };
@@ -152,7 +192,9 @@ export class UsersController {
   @Roles(Role.ADMIN)
   async deleteUser(@Param('id') id: string, @User() currentUser: any) {
     if (currentUser.id === id) {
-      throw new ForbiddenException('Bạn không thể tự xóa tài khoản của chính mình');
+      throw new ForbiddenException(
+        'Bạn không thể tự xóa tài khoản của chính mình',
+      );
     }
     await this.usersService.deleteUser(id);
     return {

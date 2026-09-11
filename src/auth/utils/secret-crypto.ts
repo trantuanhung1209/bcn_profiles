@@ -1,4 +1,9 @@
-import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'crypto';
+import {
+  createCipheriv,
+  createDecipheriv,
+  createHash,
+  randomBytes,
+} from 'crypto';
 
 const PREFIX = 'enc:v1:';
 
@@ -10,7 +15,9 @@ function resolveKeyMaterial(): string {
   const key =
     process.env.TOTP_ENCRYPTION_KEY?.trim() || process.env.JWT_SECRET?.trim();
   if (!key) {
-    throw new Error('TOTP_ENCRYPTION_KEY or JWT_SECRET is required to encrypt secrets');
+    throw new Error(
+      'TOTP_ENCRYPTION_KEY or JWT_SECRET is required to encrypt secrets',
+    );
   }
   return key;
 }
@@ -18,8 +25,15 @@ function resolveKeyMaterial(): string {
 /** Encrypt a TOTP secret at rest. Output is self-describing (`enc:v1:...`). */
 export function encryptSecret(plainText: string): string {
   const iv = randomBytes(12);
-  const cipher = createCipheriv('aes-256-gcm', deriveKey(resolveKeyMaterial()), iv);
-  const encrypted = Buffer.concat([cipher.update(plainText, 'utf8'), cipher.final()]);
+  const cipher = createCipheriv(
+    'aes-256-gcm',
+    deriveKey(resolveKeyMaterial()),
+    iv,
+  );
+  const encrypted = Buffer.concat([
+    cipher.update(plainText, 'utf8'),
+    cipher.final(),
+  ]);
   const tag = cipher.getAuthTag();
   return `${PREFIX}${iv.toString('base64url')}:${tag.toString('base64url')}:${encrypted.toString('base64url')}`;
 }

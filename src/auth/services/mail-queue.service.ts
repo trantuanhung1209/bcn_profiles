@@ -17,8 +17,13 @@ export class MailQueueService {
   private activeCount = 0;
 
   constructor(private readonly configService: ConfigService) {
-    const configured = Number(this.configService.get<string>('MAIL_QUEUE_CONCURRENCY') ?? 5);
-    this.maxConcurrent = Number.isFinite(configured) && configured > 0 ? Math.floor(configured) : 5;
+    const configured = Number(
+      this.configService.get<string>('MAIL_QUEUE_CONCURRENCY') ?? 5,
+    );
+    this.maxConcurrent =
+      Number.isFinite(configured) && configured > 0
+        ? Math.floor(configured)
+        : 5;
   }
 
   enqueue<T>(name: string, execute: TaskExecutor<T>): Promise<T> {

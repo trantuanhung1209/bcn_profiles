@@ -4,19 +4,23 @@ import { AppService } from './app.service';
 
 describe('AppController', () => {
   let appController: AppController;
+  const appService = {
+    getHello: jest.fn(() => 'Hello Chat App With NestJS!'),
+    checkDatabaseConnection: jest.fn(),
+  };
 
   beforeEach(async () => {
     const app: TestingModule = await Test.createTestingModule({
       controllers: [AppController],
-      providers: [AppService],
+      providers: [{ provide: AppService, useValue: appService }],
     }).compile();
 
     appController = app.get<AppController>(AppController);
   });
 
   describe('root', () => {
-    it('should return "Hello World!"', () => {
-      expect(appController.getHello()).toBe('Hello World!');
+    it('should return the service greeting', () => {
+      expect(appController.getHello()).toBe('Hello Chat App With NestJS!');
     });
   });
 });

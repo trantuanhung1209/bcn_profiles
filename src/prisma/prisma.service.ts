@@ -1,11 +1,19 @@
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool, PoolClient } from 'pg';
 import { PrismaClient } from 'prisma/client/client';
 
 @Injectable()
-export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
+export class PrismaService
+  extends PrismaClient
+  implements OnModuleInit, OnModuleDestroy
+{
   private readonly logger = new Logger(PrismaService.name);
   private readonly pool: Pool;
 
@@ -14,7 +22,9 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
       connectionString: process.env.DATABASE_URL!,
       max: Number(process.env.DB_POOL_MAX ?? 10),
       idleTimeoutMillis: Number(process.env.DB_POOL_IDLE_MS ?? 60_000),
-      connectionTimeoutMillis: Number(process.env.DB_POOL_CONNECT_TIMEOUT_MS ?? 10_000),
+      connectionTimeoutMillis: Number(
+        process.env.DB_POOL_CONNECT_TIMEOUT_MS ?? 10_000,
+      ),
       keepAlive: true,
       allowExitOnIdle: false,
     });
@@ -75,7 +85,9 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     return `${yearSuffix}${random}`;
   }
 
-  async createUserWithUniqueId<T>(createFn: (id: string) => Promise<T>): Promise<T> {
+  async createUserWithUniqueId<T>(
+    createFn: (id: string) => Promise<T>,
+  ): Promise<T> {
     for (let attempt = 0; attempt < 5; attempt++) {
       try {
         return await createFn(this.generateUserId());

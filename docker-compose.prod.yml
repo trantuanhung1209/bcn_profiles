@@ -1,0 +1,23 @@
+services:
+  app:
+    image: '${IMAGE_NAME}:${IMAGE_TAG}'
+    container_name: bcn_profiles
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - '127.0.0.1:${HOST_PORT}:${PORT}'
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - >-
+          fetch('http://127.0.0.1:' + process.env.PORT + '/health')
+          .then((response) => process.exit(response.ok ? 0 : 1))
+          .catch(() => process.exit(1))
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    stop_grace_period: 20s

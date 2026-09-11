@@ -61,7 +61,10 @@ export class AuthChallengeService {
   /**
    * Validate challenge JWT + DB row. Does not consume.
    */
-  async validate(token: string, expectedType: ChallengeType): Promise<ChallengePayload> {
+  async validate(
+    token: string,
+    expectedType: ChallengeType,
+  ): Promise<ChallengePayload> {
     let payload: { sub?: string; email?: string; type?: string; jti?: string };
     try {
       payload = this.jwtService.verify(token, { secret: this.jwtSecret() });
@@ -69,7 +72,12 @@ export class AuthChallengeService {
       throw new UnauthorizedException('Invalid or expired challenge token');
     }
 
-    if (payload.type !== expectedType || !payload.jti || !payload.sub || !payload.email) {
+    if (
+      payload.type !== expectedType ||
+      !payload.jti ||
+      !payload.sub ||
+      !payload.email
+    ) {
       throw new UnauthorizedException('Invalid token type');
     }
 
@@ -92,7 +100,9 @@ export class AuthChallengeService {
       userId: row.userId,
       email: row.email,
       type: expectedType,
-      totpSecret: row.totpSecretEnc ? decryptSecret(row.totpSecretEnc) : undefined,
+      totpSecret: row.totpSecretEnc
+        ? decryptSecret(row.totpSecretEnc)
+        : undefined,
     };
   }
 

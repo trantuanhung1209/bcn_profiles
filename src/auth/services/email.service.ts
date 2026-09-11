@@ -52,7 +52,10 @@ export class EmailService {
     });
   }
 
-  private compileTemplate(templateName: string, data: Record<string, unknown>): string {
+  private compileTemplate(
+    templateName: string,
+    data: Record<string, unknown>,
+  ): string {
     const templatePath = path.join(
       process.cwd(),
       'dist',

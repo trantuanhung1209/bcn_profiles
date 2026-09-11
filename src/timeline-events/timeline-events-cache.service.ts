@@ -36,7 +36,11 @@ export class TimelineEventsCacheService {
     limit: number,
     value: unknown[],
   ): Promise<void> {
-    await this.redis.setJson(this.listKey(userId, page, limit), value, this.ttlMs);
+    await this.redis.setJson(
+      this.listKey(userId, page, limit),
+      value,
+      this.ttlMs,
+    );
   }
 
   async getDetail(id: number): Promise<unknown | undefined> {
@@ -51,7 +55,8 @@ export class TimelineEventsCacheService {
     await this.redis.delByPrefix('timeline:');
   }
 
-  async invalidateUser(_userId: string): Promise<void> {
+  async invalidateUser(userId: string): Promise<void> {
+    void userId;
     await this.invalidateAll();
   }
 }

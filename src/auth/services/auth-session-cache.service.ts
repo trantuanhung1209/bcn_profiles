@@ -59,7 +59,10 @@ export class AuthSessionCacheService {
   /**
    * Kill all sessions issued before now (checked against JWT `iat`).
    */
-  async setRevokedBefore(userId: string, atMs: number = Date.now()): Promise<void> {
+  async setRevokedBefore(
+    userId: string,
+    atMs: number = Date.now(),
+  ): Promise<void> {
     await this.redis.set(
       this.revokedBeforeKey(userId),
       String(atMs),

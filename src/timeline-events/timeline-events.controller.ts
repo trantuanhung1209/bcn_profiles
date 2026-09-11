@@ -26,13 +26,23 @@ export class TimelineEventsController {
   constructor(private readonly timelineEventsService: TimelineEventsService) {}
 
   @Post()
-  create(@User('id') userId: string, @Body() createDto: CreateTimelineEventDto) {
+  create(
+    @User('id') userId: string,
+    @Body() createDto: CreateTimelineEventDto,
+  ) {
     return this.timelineEventsService.create(userId, createDto);
   }
 
   @Get('my-timeline')
-  findMyTimeline(@User('id') userId: string, @Query() query: QueryTimelineEventsDto) {
-    return this.timelineEventsService.findAllByUser(userId, query.page, query.limit);
+  findMyTimeline(
+    @User('id') userId: string,
+    @Query() query: QueryTimelineEventsDto,
+  ) {
+    return this.timelineEventsService.findAllByUser(
+      userId,
+      query.page,
+      query.limit,
+    );
   }
 
   @Get(':id')

@@ -23,9 +23,12 @@ import { createWinstonLoggerOptions } from './common/logging/winston.config';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: process.env.NODE_ENV === 'production' ? '.env.production' : '.env',
+      envFilePath:
+        process.env.NODE_ENV === 'production' ? '.env.production' : '.env',
     }),
-    WinstonModule.forRoot(createWinstonLoggerOptions(process.env.SERVICE_NAME ?? 'profile_api')),
+    WinstonModule.forRoot(
+      createWinstonLoggerOptions(process.env.SERVICE_NAME ?? 'profile_api'),
+    ),
     ThrottlerModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

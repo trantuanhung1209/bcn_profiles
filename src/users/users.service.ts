@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Injectable,
   NotFoundException,
   ConflictException,
@@ -11,11 +12,22 @@ import { User, UserStatus } from 'prisma/client/client';
 import * as bcrypt from 'bcrypt';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { CreateAvatarUploadSignatureDto } from './dto/create-avatar-upload-signature.dto';
+import { SetAvatarDto } from './dto/set-avatar.dto';
 import { EmailService } from '../auth/services/email.service';
 import { AuthSessionCacheService } from '../auth/services/auth-session-cache.service';
 import { UsersListCacheService } from './users-list-cache.service';
+import { CloudinaryService } from '../common/storage/cloudinary.service';
 
-export type UserWithoutPassword = Omit<User, 'password' | 'twoFactorEnabled' | 'twoFactorRequired' | 'totpSecret' | 'twoFactorRecoveryCodes'>;
+export type UserWithoutPassword = Omit<
+  User,
+  | 'password'
+  | 'twoFactorEnabled'
+  | 'twoFactorRequired'
+  | 'totpSecret'
+  | 'twoFactorRecoveryCodes'
+  | 'avatarPublicId'
+>;
 
 export type SortableUserFields =
   | 'id'
@@ -75,6 +87,7 @@ export class UsersService implements OnModuleInit {
     private emailService: EmailService,
     private readonly sessionCache: AuthSessionCacheService,
     private readonly listCache: UsersListCacheService,
+    private readonly cloudinaryService: CloudinaryService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -98,18 +111,49 @@ export class UsersService implements OnModuleInit {
         { scope: 'all', page: 1, limit: 10, sort: 'createdAt', order: 'desc' },
         { scope: 'all', page: 1, limit: 10, sort: 'createdAt', order: 'asc' },
         { scope: 'all', page: 2, limit: 10, sort: 'fullName', order: 'asc' },
-        { scope: 'pending', page: 1, limit: 10, sort: 'createdAt', order: 'desc' },
-        { scope: 'pending', page: 1, limit: 10, sort: 'createdAt', order: 'asc' },
-        { scope: 'pending', page: 1, limit: 10, sort: 'fullName', order: 'asc' },
+        {
+          scope: 'pending',
+          page: 1,
+          limit: 10,
+          sort: 'createdAt',
+          order: 'desc',
+        },
+        {
+          scope: 'pending',
+          page: 1,
+          limit: 10,
+          sort: 'createdAt',
+          order: 'asc',
+        },
+        {
+          scope: 'pending',
+          page: 1,
+          limit: 10,
+          sort: 'fullName',
+          order: 'asc',
+        },
       ];
 
       const pages = await Promise.all(
         hotQueries.map(async (query) => {
           const result =
             query.scope === 'pending'
-              ? await this.queryPendingPage(query.page, query.limit, query.sort, query.order)
-              : await this.queryAllPage(query.page, query.limit, query.sort, query.order);
-          await this.listCache.setPage(this.listCache.buildPageKey({ ...query }), result);
+              ? await this.queryPendingPage(
+                  query.page,
+                  query.limit,
+                  query.sort,
+                  query.order,
+                )
+              : await this.queryAllPage(
+                  query.page,
+                  query.limit,
+                  query.sort,
+                  query.order,
+                );
+          await this.listCache.setPage(
+            this.listCache.buildPageKey({ ...query }),
+            result,
+          );
           return { query, result };
         }),
       );
@@ -121,8 +165,14 @@ export class UsersService implements OnModuleInit {
       const userIds = new Set<string>();
       for (const { query, result } of pages) {
         const isPrimary =
-          (query.scope === 'all' && query.sort === 'fullName' && query.order === 'asc' && query.page === 1) ||
-          (query.scope === 'pending' && query.sort === 'createdAt' && query.order === 'desc' && query.page === 1);
+          (query.scope === 'all' &&
+            query.sort === 'fullName' &&
+            query.order === 'asc' &&
+            query.page === 1) ||
+          (query.scope === 'pending' &&
+            query.sort === 'createdAt' &&
+            query.order === 'desc' &&
+            query.page === 1);
         if (!isPrimary) continue;
         for (const row of result.data) {
           const id = (row as { id?: string }).id;
@@ -183,7 +233,13 @@ export class UsersService implements OnModuleInit {
       return cached as PaginatedUsers;
     }
 
-    const result = await this.queryPendingPage(page, limit, sort, order, search);
+    const result = await this.queryPendingPage(
+      page,
+      limit,
+      sort,
+      order,
+      search,
+    );
     await this.listCache.setPage(cacheKey, result);
     return result;
   }
@@ -227,8 +283,18 @@ export class UsersService implements OnModuleInit {
       ...(normalizedSearch
         ? {
             OR: [
-              { fullName: { contains: normalizedSearch, mode: 'insensitive' as const } },
-              { email: { contains: normalizedSearch, mode: 'insensitive' as const } },
+              {
+                fullName: {
+                  contains: normalizedSearch,
+                  mode: 'insensitive' as const,
+                },
+              },
+              {
+                email: {
+                  contains: normalizedSearch,
+                  mode: 'insensitive' as const,
+                },
+              },
             ],
           }
         : {}),
@@ -261,8 +327,18 @@ export class UsersService implements OnModuleInit {
     const where = normalizedSearch
       ? {
           OR: [
-            { fullName: { contains: normalizedSearch, mode: 'insensitive' as const } },
-            { email: { contains: normalizedSearch, mode: 'insensitive' as const } },
+            {
+              fullName: {
+                contains: normalizedSearch,
+                mode: 'insensitive' as const,
+              },
+            },
+            {
+              email: {
+                contains: normalizedSearch,
+                mode: 'insensitive' as const,
+              },
+            },
           ],
         }
       : undefined;
@@ -437,7 +513,8 @@ export class UsersService implements OnModuleInit {
   }
 
   async createUser(createUserDto: CreateUserDto): Promise<UserWithoutPassword> {
-    const { email, password, fullName, avatar, phone, metadata } = createUserDto;
+    const { email, password, fullName, avatar, phone, metadata } =
+      createUserDto;
 
     // Kiểm tra email đã tồn tại chưa
     const existingUser = await this.prisma.user.findUnique({
@@ -495,16 +572,23 @@ export class UsersService implements OnModuleInit {
       throw new NotFoundException(`User với ID ${id} không tồn tại`);
     }
     if (user.status !== 'PENDING') {
-      throw new ConflictException('Chỉ có thể từ chối tài khoản đang chờ duyệt');
+      throw new ConflictException(
+        'Chỉ có thể từ chối tài khoản đang chờ duyệt',
+      );
     }
 
     await this.prisma.user.delete({ where: { id } });
     await this.sessionCache.invalidateUser(id);
     await this.invalidateListCaches();
 
-    void this.emailService.sendRejectionEmail(user.email, user.fullName || undefined).catch((error) => {
-      this.logger.error('Failed to send rejection email in background', error instanceof Error ? error.stack : undefined);
-    });
+    void this.emailService
+      .sendRejectionEmail(user.email, user.fullName || undefined)
+      .catch((error) => {
+        this.logger.error(
+          'Failed to send rejection email in background',
+          error instanceof Error ? error.stack : undefined,
+        );
+      });
   }
 
   async approveUser(id: string): Promise<UserWithoutPassword> {
@@ -539,10 +623,15 @@ export class UsersService implements OnModuleInit {
     await this.sessionCache.invalidateUser(id);
     await this.invalidateListCaches();
 
-    void this.emailService.sendApprovalEmail(user.email, user.fullName || undefined).catch((error) => {
-      // Không rollback nếu gửi email lỗi — tài khoản vẫn được duyệt
-      this.logger.error('Failed to send approval email in background', error instanceof Error ? error.stack : undefined);
-    });
+    void this.emailService
+      .sendApprovalEmail(user.email, user.fullName || undefined)
+      .catch((error) => {
+        // Không rollback nếu gửi email lỗi — tài khoản vẫn được duyệt
+        this.logger.error(
+          'Failed to send approval email in background',
+          error instanceof Error ? error.stack : undefined,
+        );
+      });
 
     return updatedUser;
   }
@@ -626,9 +715,13 @@ export class UsersService implements OnModuleInit {
       throw new NotFoundException(`User với ID ${id} không tồn tại`);
     }
 
+    const avatarPublicId = user.avatarPublicId;
     await this.prisma.user.delete({
       where: { id },
     });
+    if (avatarPublicId) {
+      await this.cloudinaryService.deleteImage(avatarPublicId);
+    }
     await this.sessionCache.invalidateUser(id);
     await this.invalidateListCaches();
   }
@@ -637,7 +730,6 @@ export class UsersService implements OnModuleInit {
     id: string,
     updateUserDto: UpdateUserDto,
   ): Promise<UserWithoutPassword> {
-    // Kiểm tra user có tồn tại không
     const user = await this.prisma.user.findUnique({
       where: { id },
     });
@@ -646,17 +738,65 @@ export class UsersService implements OnModuleInit {
       throw new NotFoundException(`User với ID ${id} không tồn tại`);
     }
 
-    // Chỉ update các trường được phép: fullName, avatar, phone, metadata
-    // metadata được merge với data cũ thay vì replace toàn bộ
+    const hasAvatar = updateUserDto.avatar !== undefined;
+    const hasAvatarPublicId = updateUserDto.avatarPublicId !== undefined;
+    const clearingAvatar =
+      updateUserDto.avatar === null &&
+      (!hasAvatarPublicId || updateUserDto.avatarPublicId === null);
+    const settingAvatar =
+      typeof updateUserDto.avatar === 'string' &&
+      typeof updateUserDto.avatarPublicId === 'string' &&
+      updateUserDto.avatarPublicId.length > 0;
+    const legacyAvatarUpdate =
+      typeof updateUserDto.avatar === 'string' && !hasAvatarPublicId;
+
+    if (
+      (hasAvatarPublicId && !hasAvatar) ||
+      (hasAvatarPublicId &&
+        updateUserDto.avatarPublicId === null &&
+        updateUserDto.avatar !== null) ||
+      (updateUserDto.avatar === null &&
+        hasAvatarPublicId &&
+        updateUserDto.avatarPublicId !== null)
+    ) {
+      throw new BadRequestException(
+        'avatar và avatarPublicId phải cùng có giá trị hoặc cùng là null',
+      );
+    }
+
+    if (settingAvatar) {
+      await this.validateCloudinaryAvatar(
+        id,
+        updateUserDto.avatar!,
+        updateUserDto.avatarPublicId!,
+      );
+    }
+
+    const previousPublicId = user.avatarPublicId;
+
     const updatedUser = await this.prisma.user.update({
       where: { id },
       data: {
-        fullName: updateUserDto.fullName,
-        avatar: updateUserDto.avatar,
-        phone: updateUserDto.phone,
+        ...(updateUserDto.fullName !== undefined && {
+          fullName: updateUserDto.fullName,
+        }),
+        ...(updateUserDto.phone !== undefined && {
+          phone: updateUserDto.phone,
+        }),
+        ...(clearingAvatar && { avatar: null, avatarPublicId: null }),
+        ...(settingAvatar && {
+          avatar: updateUserDto.avatar,
+          avatarPublicId: updateUserDto.avatarPublicId,
+        }),
+        ...(legacyAvatarUpdate && {
+          avatar: updateUserDto.avatar,
+          avatarPublicId: null,
+        }),
         ...(updateUserDto.metadata !== undefined && {
           metadata: {
-            ...(typeof user.metadata === 'object' && user.metadata !== null ? user.metadata : {}),
+            ...(typeof user.metadata === 'object' && user.metadata !== null
+              ? user.metadata
+              : {}),
             ...updateUserDto.metadata,
           },
         }),
@@ -679,9 +819,128 @@ export class UsersService implements OnModuleInit {
       },
     });
 
+    if (
+      previousPublicId &&
+      (clearingAvatar ||
+        legacyAvatarUpdate ||
+        (settingAvatar && previousPublicId !== updateUserDto.avatarPublicId))
+    ) {
+      await this.cloudinaryService.deleteImage(previousPublicId);
+    }
+
     await this.sessionCache.invalidateUser(id);
     await this.invalidateListCaches();
-    return updatedUser;
+    return updatedUser as UserWithoutPassword;
+  }
+
+  createAvatarUploadSignature(
+    userId: string,
+    dto: CreateAvatarUploadSignatureDto,
+  ) {
+    const folder = this.getAvatarFolder(userId);
+    const timestamp = Math.floor(Date.now() / 1000);
+    const publicId = dto.publicId?.trim()
+      ? this.sanitizePublicId(dto.publicId)
+      : undefined;
+
+    return this.cloudinaryService.createUploadSignature({
+      timestamp,
+      folder,
+      publicId,
+      includeMaxBytes: true,
+      ...this.cloudinaryService.getImageOptimizationDefaults(),
+    });
+  }
+
+  async setAvatar(
+    userId: string,
+    dto: SetAvatarDto,
+  ): Promise<UserWithoutPassword> {
+    return this.updateUser(userId, {
+      avatar: dto.avatar,
+      avatarPublicId: dto.avatarPublicId,
+    });
+  }
+
+  async clearAvatar(userId: string): Promise<UserWithoutPassword> {
+    return this.updateUser(userId, {
+      avatar: null,
+      avatarPublicId: null,
+    });
+  }
+
+  private async validateCloudinaryAvatar(
+    userId: string,
+    avatarUrl: string,
+    avatarPublicId: string,
+  ): Promise<void> {
+    const { cloudName } = this.cloudinaryService.getCloudinaryConfig();
+    let parsed: URL;
+    try {
+      parsed = new URL(avatarUrl);
+    } catch {
+      throw new BadRequestException('avatar is not a valid URL');
+    }
+
+    if (
+      parsed.protocol !== 'https:' ||
+      parsed.hostname !== 'res.cloudinary.com'
+    ) {
+      throw new BadRequestException(
+        'avatar must be a valid Cloudinary https URL',
+      );
+    }
+
+    const expectedFolder = this.getAvatarFolder(userId);
+    if (!avatarPublicId.startsWith(`${expectedFolder}/`)) {
+      throw new BadRequestException(
+        'avatar does not belong to the current user',
+      );
+    }
+
+    let decodedPath: string;
+    try {
+      decodedPath = decodeURIComponent(parsed.pathname);
+    } catch {
+      throw new BadRequestException('avatar contains an invalid URL path');
+    }
+
+    if (!decodedPath.startsWith(`/${cloudName}/image/upload/`)) {
+      throw new BadRequestException(
+        'avatar does not belong to the configured Cloudinary cloud',
+      );
+    }
+
+    const escapedPublicId = avatarPublicId.replace(
+      /[.*+?^${}()|[\]\\]/g,
+      '\\$&',
+    );
+    if (!new RegExp(`/${escapedPublicId}\\.[a-zA-Z0-9]+$`).test(decodedPath)) {
+      throw new BadRequestException('avatar URL does not match avatarPublicId');
+    }
+
+    await this.cloudinaryService.assertImageWithinMaxBytes(avatarPublicId);
+  }
+
+  private getAvatarFolder(userId: string): string {
+    const baseFolder =
+      (process.env.CLOUDINARY_AVATAR_FOLDER ?? '')
+        .trim()
+        .replace(/^\/+|\/+$/g, '') || 'user-avatars';
+    return `${baseFolder}/${userId}`;
+  }
+
+  private sanitizePublicId(input: string): string {
+    const trimmed = input.trim();
+    const sanitized = trimmed
+      .replace(/[^a-zA-Z0-9/_-]/g, '_')
+      .replace(/^\/+|\/+$/g, '');
+
+    if (!sanitized) {
+      throw new BadRequestException('publicId is invalid');
+    }
+
+    return sanitized;
   }
 
   async searchUsers(
@@ -692,7 +951,11 @@ export class UsersService implements OnModuleInit {
 
     const cached = await this.listCache.getSearch(normalizedQuery);
     if (cached) {
-      return cached as { id: string; fullName: string | null; avatar: string | null }[];
+      return cached as {
+        id: string;
+        fullName: string | null;
+        avatar: string | null;
+      }[];
     }
 
     const results = await this.prisma.user.findMany({

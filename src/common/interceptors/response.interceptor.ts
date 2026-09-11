@@ -18,7 +18,7 @@ export class ResponseInterceptor implements NestInterceptor {
           message: 'Success',
           data,
         };
-      })
+      }),
     );
   }
 }

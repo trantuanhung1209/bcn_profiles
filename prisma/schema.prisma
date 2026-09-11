@@ -54,6 +54,7 @@ model User {
   password                  String?
   fullName                  String?
   avatar                    String?
+  avatarPublicId            String?
   createdAt                 DateTime                     @default(now())
   updatedAt                 DateTime
   role                      String                       @default("USER")

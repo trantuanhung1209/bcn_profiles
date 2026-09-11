@@ -8,7 +8,7 @@ import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
 import { RequestLoggingInterceptor } from './common/logging/request-logging.interceptor';
 import helmet from 'helmet';
-const cookieParser = require('cookie-parser');
+import cookieParser from 'cookie-parser';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
@@ -25,7 +25,11 @@ async function bootstrap() {
         directives: {
           'style-src': ["'self'", 'https://fonts.googleapis.com'],
           'font-src': ["'self'", 'https://fonts.gstatic.com', 'data:'],
-          'connect-src': ["'self'", 'https://profiles.uside.id.vn', 'http://127.0.0.1:3000'],
+          'connect-src': [
+            "'self'",
+            'https://profiles.bcn.id.vn',
+            'http://127.0.0.1:3000',
+          ],
         },
       },
     }),
@@ -42,7 +46,7 @@ async function bootstrap() {
       index: 'index.html',
     });
   }
-  
+
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -50,7 +54,10 @@ async function bootstrap() {
       transform: true,
     }),
   );
-  app.useGlobalInterceptors(app.get(RequestLoggingInterceptor), new ResponseInterceptor());
+  app.useGlobalInterceptors(
+    app.get(RequestLoggingInterceptor),
+    new ResponseInterceptor(),
+  );
 
   const envOrigins = (process.env.CORS_ORIGINS ?? '')
     .split(',')
@@ -69,7 +76,10 @@ async function bootstrap() {
   ];
 
   app.enableCors({
-    origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+    origin: (
+      origin: string | undefined,
+      callback: (err: Error | null, allow?: boolean) => void,
+    ) => {
       if (!origin) {
         callback(null, true);
         return;
@@ -85,7 +95,7 @@ async function bootstrap() {
     },
     credentials: true,
   });
-  
+
   const port = getRequiredPort();
   await app.listen(port);
   logger.log(`Application is running on port: ${port}`);
@@ -104,4 +114,4 @@ function getRequiredPort(): string {
   return port;
 }
 
-bootstrap();
+void bootstrap();

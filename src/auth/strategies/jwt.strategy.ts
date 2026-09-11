@@ -76,12 +76,17 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         throw new UnauthorizedException('Tài khoản đang chờ admin phê duyệt.');
       }
       if (user.status === 'BLOCKED') {
-        throw new UnauthorizedException('Tài khoản đã bị khóa. Vui lòng liên hệ admin.');
+        throw new UnauthorizedException(
+          'Tài khoản đã bị khóa. Vui lòng liên hệ admin.',
+        );
       }
 
       return user;
     } catch (error) {
-      this.logger.error('JWT validation failed', error instanceof Error ? error.stack : undefined);
+      this.logger.error(
+        'JWT validation failed',
+        error instanceof Error ? error.stack : undefined,
+      );
       throw error;
     }
   }

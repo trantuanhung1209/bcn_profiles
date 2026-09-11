@@ -90,7 +90,11 @@ jobs:
           APP_PORT_VALUE: ${{ vars.APP_PORT }}
           HOST_PORT_VALUE: ${{ vars.HOST_PORT }}
           APP_URL_VALUE: ${{ vars.APP_URL || secrets.APP_URL }}
+          POSTGRES_USER_VALUE: ${{ vars.POSTGRES_USER }}
+          POSTGRES_DB_VALUE: ${{ vars.POSTGRES_DB }}
+          POSTGRES_PASSWORD_VALUE: ${{ secrets.POSTGRES_PASSWORD }}
           DATABASE_URL_VALUE: ${{ secrets.DATABASE_URL }}
+          REDIS_PASSWORD_VALUE: ${{ secrets.REDIS_PASSWORD }}
           REDIS_URL_VALUE: ${{ secrets.REDIS_URL }}
           JWT_SECRET_VALUE: ${{ secrets.JWT_SECRET }}
           JWT_REFRESH_SECRET_VALUE: ${{ secrets.JWT_REFRESH_SECRET }}
@@ -115,7 +119,11 @@ jobs:
           check_required APP_PORT "$APP_PORT_VALUE"
           check_required HOST_PORT "$HOST_PORT_VALUE"
           check_required APP_URL "$APP_URL_VALUE"
+          check_required POSTGRES_USER "$POSTGRES_USER_VALUE"
+          check_required POSTGRES_DB "$POSTGRES_DB_VALUE"
+          check_required POSTGRES_PASSWORD "$POSTGRES_PASSWORD_VALUE"
           check_required DATABASE_URL "$DATABASE_URL_VALUE"
+          check_required REDIS_PASSWORD "$REDIS_PASSWORD_VALUE"
           check_required REDIS_URL "$REDIS_URL_VALUE"
           check_required JWT_SECRET "$JWT_SECRET_VALUE"
           check_required JWT_REFRESH_SECRET "$JWT_REFRESH_SECRET_VALUE"
@@ -156,12 +164,16 @@ jobs:
           HOST_PORT_VALUE: ${{ vars.HOST_PORT }}
           CORS_ORIGINS_VALUE: ${{ vars.CORS_ORIGINS }}
           APP_URL_VALUE: ${{ vars.APP_URL || secrets.APP_URL }}
+          POSTGRES_USER_VALUE: ${{ vars.POSTGRES_USER }}
+          POSTGRES_DB_VALUE: ${{ vars.POSTGRES_DB }}
+          POSTGRES_PASSWORD_VALUE: ${{ secrets.POSTGRES_PASSWORD }}
           DATABASE_URL_VALUE: ${{ secrets.DATABASE_URL }}
           DB_POOL_MAX_VALUE: ${{ vars.DB_POOL_MAX || '10' }}
           DB_POOL_MIN_VALUE: ${{ vars.DB_POOL_MIN || '1' }}
           DB_POOL_IDLE_MS_VALUE: ${{ vars.DB_POOL_IDLE_MS || '300000' }}
           DB_POOL_CONNECT_TIMEOUT_MS_VALUE: ${{ vars.DB_POOL_CONNECT_TIMEOUT_MS || '10000' }}
           REDIS_URL_VALUE: ${{ secrets.REDIS_URL }}
+          REDIS_PASSWORD_VALUE: ${{ secrets.REDIS_PASSWORD }}
           REDIS_KEY_PREFIX_VALUE: ${{ vars.REDIS_KEY_PREFIX || 'bcn:profiles:' }}
           JWT_SECRET_VALUE: ${{ secrets.JWT_SECRET }}
           JWT_REFRESH_SECRET_VALUE: ${{ secrets.JWT_REFRESH_SECRET }}
@@ -201,12 +213,16 @@ jobs:
             write_env NODE_ENV production
             write_env CORS_ORIGINS "$CORS_ORIGINS_VALUE"
             write_env APP_URL "$APP_URL_VALUE"
+            write_env POSTGRES_USER "$POSTGRES_USER_VALUE"
+            write_env POSTGRES_DB "$POSTGRES_DB_VALUE"
+            write_env POSTGRES_PASSWORD "$POSTGRES_PASSWORD_VALUE"
             write_env DATABASE_URL "$DATABASE_URL_VALUE"
             write_env DB_POOL_MAX "$DB_POOL_MAX_VALUE"
             write_env DB_POOL_MIN "$DB_POOL_MIN_VALUE"
             write_env DB_POOL_IDLE_MS "$DB_POOL_IDLE_MS_VALUE"
             write_env DB_POOL_CONNECT_TIMEOUT_MS "$DB_POOL_CONNECT_TIMEOUT_MS_VALUE"
             write_env REDIS_URL "$REDIS_URL_VALUE"
+            write_env REDIS_PASSWORD "$REDIS_PASSWORD_VALUE"
             write_env REDIS_KEY_PREFIX "$REDIS_KEY_PREFIX_VALUE"
             write_env JWT_SECRET "$JWT_SECRET_VALUE"
             write_env JWT_REFRESH_SECRET "$JWT_REFRESH_SECRET_VALUE"
@@ -246,14 +262,14 @@ jobs:
         run: |
           set -eu
           cd "$PROJECT_DIR"
-          docker compose pull app
+          docker compose pull
 
       - name: Deploy
         id: deploy
         run: |
           set -eu
           cd "$PROJECT_DIR"
-          docker compose up -d --remove-orphans app
+          docker compose up -d --remove-orphans
 
       - name: Health check
         id: health
@@ -292,8 +308,8 @@ jobs:
               exit 1
               ;;
           esac
-          docker compose pull app
-          docker compose up -d --remove-orphans app
+          docker compose pull
+          docker compose up -d --remove-orphans
 
           for attempt in $(seq 1 30); do
             if curl --fail --silent --show-error \

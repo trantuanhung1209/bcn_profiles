@@ -9,12 +9,14 @@ import {
   CachedAuthUser,
 } from '../services/auth-session-cache.service';
 import { TokenRevocationService } from '../services/token-revocation.service';
+import { isTokenRevokedBefore } from '../token-issued-at';
 
 type AccessTokenPayload = {
   sub?: string;
   type?: string;
   jti?: string;
   iat?: number;
+  issuedAtMs?: number;
 };
 
 @Injectable()
@@ -59,11 +61,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       }
 
       const revokedBefore = await this.sessionCache.getRevokedBefore(userId);
-      if (
-        revokedBefore !== undefined &&
-        typeof payload.iat === 'number' &&
-        payload.iat * 1000 < revokedBefore
-      ) {
+      if (isTokenRevokedBefore(payload, revokedBefore)) {
         throw new UnauthorizedException('Phiên đăng nhập đã bị thu hồi');
       }
 

@@ -23,6 +23,7 @@ import {
   CachedAuthUser,
 } from './services/auth-session-cache.service';
 import { TokenRevocationService } from './services/token-revocation.service';
+import { isTokenRevokedBefore } from './token-issued-at';
 
 type TokenUser = {
   id: string;
@@ -47,6 +48,7 @@ type JwtTokenPayload = {
   type: 'access' | 'refresh';
   jti: string;
   iat?: number;
+  issuedAtMs?: number;
   exp?: number;
 };
 
@@ -259,11 +261,7 @@ export class AuthService {
       const revokedBefore = await this.sessionCache.getRevokedBefore(
         payload.sub,
       );
-      if (
-        revokedBefore !== undefined &&
-        typeof payload.iat === 'number' &&
-        payload.iat * 1000 < revokedBefore
-      ) {
+      if (isTokenRevokedBefore(payload, revokedBefore)) {
         throw new UnauthorizedException('Phiên đăng nhập đã bị thu hồi');
       }
 
@@ -620,10 +618,12 @@ export class AuthService {
     access_token: string;
     refresh_token: string;
   }> {
+    const issuedAtMs = Date.now();
     const cachedUser = this.toCachedAuthUser(user);
     await this.sessionCache.setUser(cachedUser);
 
     const base = {
+      issuedAtMs,
       sub: user.id,
       email: user.email,
       role: user.role,

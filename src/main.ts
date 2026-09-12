@@ -3,7 +3,7 @@ import { join } from 'path';
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from './app.module';
-import { ValidationPipe } from '@nestjs/common';
+import { ForbiddenException, ValidationPipe } from '@nestjs/common';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
 import { RequestLoggingInterceptor } from './common/logging/request-logging.interceptor';
@@ -92,7 +92,7 @@ async function bootstrap() {
         callback(null, true);
         return;
       }
-      callback(new Error(`CORS blocked: ${origin}`));
+      callback(new ForbiddenException('CORS blocked'));
     },
     credentials: true,
   });

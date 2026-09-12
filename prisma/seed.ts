@@ -26,7 +26,7 @@ async function main() {
   console.log('Start seeding...');
 
   // Hash password mặc định
-  const defaultPassword = await bcrypt.hash('1111', 10);
+  const defaultPassword = await bcrypt.hash('111111', 10);
 
   // Dữ liệu sinh viên
   const studentData = [

@@ -1,0 +1,76 @@
+name: Seed Profiles production
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production
+  cancel-in-progress: false
+
+jobs:
+  seed:
+    runs-on: [self-hosted, linux, production, docker, bcn-org]
+    environment: production
+    timeout-minutes: 10
+    steps:
+      - name: Checkout seed source
+        uses: actions/checkout@v6
+
+      - name: Check application database identity
+        run: |
+          set -euo pipefail
+          docker exec bcn_profiles node -e '
+            const { Client } = require("pg");
+            async function check() {
+              const url = new URL(process.env.DATABASE_URL);
+              if (url.hostname !== "postgres" || url.pathname !== "/profiles" || decodeURIComponent(url.username) !== "profiles_app") throw new Error("Invalid seed database target");
+              const db = new Client({connectionString: process.env.DATABASE_URL});
+              await db.connect();
+              try {
+                const {rows} = await db.query("SELECT current_database() AS db, current_user AS username");
+                if (rows[0].db !== "profiles" || rows[0].username !== "profiles_app") throw new Error("Invalid connected database identity");
+                console.log("Verified database profiles, application user profiles_app");
+              } finally { await db.end(); }
+            }
+            check().catch(() => {console.error("Database identity check failed"); process.exitCode = 1;});
+          '
+
+      - name: Run deployed prisma seed.ts
+        run: |
+          set -euo pipefail
+          cd /opt/apps/bcn_profiles
+          docker compose --env-file .env.compose run --rm --no-deps \
+            --volume "$GITHUB_WORKSPACE/prisma/seed.ts:/app/prisma/seed.ts:ro" \
+            --entrypoint ./node_modules/.bin/jiti app prisma/seed.ts | awk '
+            /^Created user:/ {created++; next}
+            /^Updated user:/ {updated++; next}
+            {print}
+            END {printf "Created users: %d; updated users: %d\n", created, updated}
+          '
+
+      - name: Verify every seeded user
+        run: |
+          set -euo pipefail
+          docker exec bcn_profiles node -e '
+            const fs = require("fs");
+            const { Client } = require("pg");
+            async function verify() {
+              const source = fs.readFileSync("prisma/seed.ts", "utf8");
+              const match = source.match(/const studentData = (\[[\s\S]*?\n  \]);/);
+              if (!match) throw new Error("Cannot parse seed data");
+              const students = JSON.parse(match[1]);
+              const db = new Client({connectionString: process.env.DATABASE_URL});
+              await db.connect();
+              try {
+                const {rows} = await db.query("SELECT email, \"fullName\", phone, metadata FROM \"users\" WHERE email = ANY($1::text[])", [students.map(u => u.email)]);
+                const users = new Map(rows.map(u => [u.email, u]));
+                const missing = students.filter(s => {const u = users.get(s.email); return !u || u.fullName !== s.hoTen || u.phone !== s.soDienThoai || u.metadata.maSV !== s.maSV;});
+                if (missing.length) throw new Error("Seed verification failed");
+                console.log(`Verified ${students.length}/${students.length} seed users in profiles`);
+              } finally { await db.end(); }
+            }
+            verify().catch(() => {console.error("Seed verification failed"); process.exitCode = 1;});
+          '

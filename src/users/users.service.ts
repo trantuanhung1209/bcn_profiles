@@ -17,7 +17,7 @@ import { SetAvatarDto } from './dto/set-avatar.dto';
 import { EmailService } from '../auth/services/email.service';
 import { AuthSessionCacheService } from '../auth/services/auth-session-cache.service';
 import { UsersListCacheService } from './users-list-cache.service';
-import { CloudinaryService } from '../common/storage/cloudinary.service';
+import { MinioService } from '../common/storage/minio.service';
 
 export type UserWithoutPassword = Omit<
   User,
@@ -87,7 +87,7 @@ export class UsersService implements OnModuleInit {
     private emailService: EmailService,
     private readonly sessionCache: AuthSessionCacheService,
     private readonly listCache: UsersListCacheService,
-    private readonly cloudinaryService: CloudinaryService,
+    private readonly minioService: MinioService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -720,7 +720,7 @@ export class UsersService implements OnModuleInit {
       where: { id },
     });
     if (avatarPublicId) {
-      await this.cloudinaryService.deleteImage(avatarPublicId);
+      await this.minioService.deleteImage(avatarPublicId);
     }
     await this.sessionCache.invalidateUser(id);
     await this.invalidateListCaches();
@@ -765,7 +765,7 @@ export class UsersService implements OnModuleInit {
     }
 
     if (settingAvatar) {
-      await this.validateCloudinaryAvatar(
+      await this.validateMinioAvatar(
         id,
         updateUserDto.avatar!,
         updateUserDto.avatarPublicId!,
@@ -825,7 +825,7 @@ export class UsersService implements OnModuleInit {
         legacyAvatarUpdate ||
         (settingAvatar && previousPublicId !== updateUserDto.avatarPublicId))
     ) {
-      await this.cloudinaryService.deleteImage(previousPublicId);
+      await this.minioService.deleteImage(previousPublicId);
     }
 
     await this.sessionCache.invalidateUser(id);
@@ -843,12 +843,11 @@ export class UsersService implements OnModuleInit {
       ? this.sanitizePublicId(dto.publicId)
       : undefined;
 
-    return this.cloudinaryService.createUploadSignature({
+    return this.minioService.createUploadSignature({
       timestamp,
       folder,
       publicId,
       includeMaxBytes: true,
-      ...this.cloudinaryService.getImageOptimizationDefaults(),
     });
   }
 
@@ -869,28 +868,12 @@ export class UsersService implements OnModuleInit {
     });
   }
 
-  private async validateCloudinaryAvatar(
+  private async validateMinioAvatar(
     userId: string,
     avatarUrl: string,
     avatarPublicId: string,
   ): Promise<void> {
-    const { cloudName } = this.cloudinaryService.getCloudinaryConfig();
-    let parsed: URL;
-    try {
-      parsed = new URL(avatarUrl);
-    } catch {
-      throw new BadRequestException('avatar is not a valid URL');
-    }
-
-    if (
-      parsed.protocol !== 'https:' ||
-      parsed.hostname !== 'res.cloudinary.com'
-    ) {
-      throw new BadRequestException(
-        'avatar must be a valid Cloudinary https URL',
-      );
-    }
-
+    this.minioService.assertObjectUrl(avatarUrl, avatarPublicId);
     const expectedFolder = this.getAvatarFolder(userId);
     if (!avatarPublicId.startsWith(`${expectedFolder}/`)) {
       throw new BadRequestException(
@@ -898,33 +881,12 @@ export class UsersService implements OnModuleInit {
       );
     }
 
-    let decodedPath: string;
-    try {
-      decodedPath = decodeURIComponent(parsed.pathname);
-    } catch {
-      throw new BadRequestException('avatar contains an invalid URL path');
-    }
-
-    if (!decodedPath.startsWith(`/${cloudName}/image/upload/`)) {
-      throw new BadRequestException(
-        'avatar does not belong to the configured Cloudinary cloud',
-      );
-    }
-
-    const escapedPublicId = avatarPublicId.replace(
-      /[.*+?^${}()|[\]\\]/g,
-      '\\$&',
-    );
-    if (!new RegExp(`/${escapedPublicId}\\.[a-zA-Z0-9]+$`).test(decodedPath)) {
-      throw new BadRequestException('avatar URL does not match avatarPublicId');
-    }
-
-    await this.cloudinaryService.assertImageWithinMaxBytes(avatarPublicId);
+    await this.minioService.assertImageWithinMaxBytes(avatarPublicId);
   }
 
   private getAvatarFolder(userId: string): string {
     const baseFolder =
-      (process.env.CLOUDINARY_AVATAR_FOLDER ?? '')
+      (process.env.MINIO_AVATAR_FOLDER ?? '')
         .trim()
         .replace(/^\/+|\/+$/g, '') || 'user-avatars';
     return `${baseFolder}/${userId}`;

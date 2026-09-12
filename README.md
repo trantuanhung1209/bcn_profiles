@@ -106,6 +106,10 @@ Tạo file `.env` từ `.env.example`:
 
 ```bash
 cp .env.example .env
+# Host dev: NODE_ENV=development, APP_PORT=3000 (Quiz: 3001),
+# DATABASE_URL=postgresql://postgres:postgres@localhost:5433/<local-db>?schema=public
+# REDIS_HOST=localhost, REDIS_PORT=6379, PROFILES_API_BASE_URL=http://localhost:3000
+# Fill MINIO_* for your development MinIO server when testing uploads.
 ```
 
 Infra dùng chung (Postgres database `profiles` + Redis) — chạy từ workspace root hoặc `infra/`:
@@ -193,3 +197,7 @@ npm run start:prod
 - Hạn chế dùng `prisma db push` trên production để tránh lệch lịch sử migration.
 - Đảm bảo secrets (`JWT_SECRET`, optional `TOTP_ENCRYPTION_KEY`, mail credentials) được quản lý qua biến môi trường an toàn.
 - FE integration: xem checklist + pseudo-code trong [API_DOCS.md](./API_DOCS.md) (Cookies & Tokens).
+
+## Production shared infrastructure
+
+Xem [DEPLOY.md](DEPLOY.md) cho PostgreSQL/Redis/MinIO dùng chung, GitHub Environment `production` và luồng upload MinIO mới.

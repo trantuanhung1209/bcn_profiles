@@ -1,74 +1,29 @@
+# Production uses infrastructure managed separately by the server admin.
 services:
   app:
-    image: '${IMAGE_NAME}:${IMAGE_TAG}'
+    image: ${IMAGE_NAME:?IMAGE_NAME is required}:${IMAGE_TAG:?IMAGE_TAG is required}
     container_name: bcn_profiles
     restart: unless-stopped
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
     env_file:
-      - .env
+      - path: .env
+        format: raw
     ports:
-      - '127.0.0.1:${HOST_PORT}:${PORT}'
+      - '127.0.0.1:${HOST_PORT:?HOST_PORT is required}:${APP_PORT:?APP_PORT is required}'
+    networks:
+      - bcn-infra
     healthcheck:
       test:
         - CMD
         - node
         - -e
         - >-
-          fetch('http://127.0.0.1:' + process.env.PORT + '/health')
-          .then((response) => process.exit(response.ok ? 0 : 1))
-          .catch(() => process.exit(1))
+          fetch('http://127.0.0.1:' + process.env.APP_PORT + '/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 6
       start_period: 30s
     stop_grace_period: 20s
 
-  postgres:
-    image: postgres:17-alpine
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: '${POSTGRES_USER}'
-      POSTGRES_PASSWORD: '${POSTGRES_PASSWORD}'
-      POSTGRES_DB: '${POSTGRES_DB}'
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test:
-        - CMD-SHELL
-        - 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"'
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 10s
-    stop_grace_period: 30s
-
-  redis:
-    image: redis:7-alpine
-    restart: unless-stopped
-    environment:
-      REDIS_PASSWORD: '${REDIS_PASSWORD}'
-    command:
-      - redis-server
-      - --appendonly
-      - 'yes'
-      - --requirepass
-      - '${REDIS_PASSWORD}'
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test:
-        - CMD-SHELL
-        - 'REDISCLI_AUTH="$${REDIS_PASSWORD}" redis-cli ping | grep PONG'
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 5s
-    stop_grace_period: 20s
-
-volumes:
-  postgres_data:
-  redis_data:
+networks:
+  bcn-infra:
+    external: true

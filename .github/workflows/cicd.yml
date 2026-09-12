@@ -50,6 +50,9 @@ jobs:
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=high
 
+      - name: Test production environment and compose
+        run: node --test scripts/generate-production-env.test.mjs
+
       - name: Build
         run: npm run build
 
@@ -73,7 +76,7 @@ jobs:
     name: Deploy Production
     needs: ci
     runs-on: [self-hosted, linux, production, docker, bcn-org]
-    environment: profiles-bcn
+    environment: production
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -85,191 +88,54 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Check required production configuration
+      - name: Setup Node.js for environment validation
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Generate and validate production environment
         env:
-          APP_PORT_VALUE: ${{ vars.APP_PORT }}
-          HOST_PORT_VALUE: ${{ vars.HOST_PORT }}
-          APP_URL_VALUE: ${{ vars.APP_URL || secrets.APP_URL }}
-          POSTGRES_USER_VALUE: ${{ vars.POSTGRES_USER }}
-          POSTGRES_DB_VALUE: ${{ vars.POSTGRES_DB }}
-          POSTGRES_PASSWORD_VALUE: ${{ secrets.POSTGRES_PASSWORD }}
-          DATABASE_URL_VALUE: ${{ secrets.DATABASE_URL }}
-          REDIS_PASSWORD_VALUE: ${{ secrets.REDIS_PASSWORD }}
-          REDIS_URL_VALUE: ${{ secrets.REDIS_URL }}
-          JWT_SECRET_VALUE: ${{ secrets.JWT_SECRET }}
-          JWT_REFRESH_SECRET_VALUE: ${{ secrets.JWT_REFRESH_SECRET }}
-          RESEND_API_KEY_VALUE: ${{ secrets.RESEND_API_KEY }}
-          EMAIL_FROM_VALUE: ${{ vars.EMAIL_FROM }}
-          CLOUDINARY_CLOUD_NAME_VALUE: ${{ vars.CLOUDINARY_CLOUD_NAME }}
-          CLOUDINARY_API_KEY_VALUE: ${{ secrets.CLOUDINARY_API_KEY }}
-          CLOUDINARY_API_SECRET_VALUE: ${{ secrets.CLOUDINARY_API_SECRET }}
-        run: |
-          set -eu
-
-          check_required() {
-            name="$1"
-            value="$2"
-            if [ -z "$value" ]; then
-              echo "Missing required production configuration: $name"
-              exit 1
-            fi
-            echo "$name configured"
-          }
-
-          check_required APP_PORT "$APP_PORT_VALUE"
-          check_required HOST_PORT "$HOST_PORT_VALUE"
-          check_required APP_URL "$APP_URL_VALUE"
-          check_required POSTGRES_USER "$POSTGRES_USER_VALUE"
-          check_required POSTGRES_DB "$POSTGRES_DB_VALUE"
-          check_required POSTGRES_PASSWORD "$POSTGRES_PASSWORD_VALUE"
-          check_required DATABASE_URL "$DATABASE_URL_VALUE"
-          check_required REDIS_PASSWORD "$REDIS_PASSWORD_VALUE"
-          check_required REDIS_URL "$REDIS_URL_VALUE"
-          check_required JWT_SECRET "$JWT_SECRET_VALUE"
-          check_required JWT_REFRESH_SECRET "$JWT_REFRESH_SECRET_VALUE"
-          check_required RESEND_API_KEY "$RESEND_API_KEY_VALUE"
-          check_required EMAIL_FROM "$EMAIL_FROM_VALUE"
-          check_required CLOUDINARY_CLOUD_NAME "$CLOUDINARY_CLOUD_NAME_VALUE"
-          check_required CLOUDINARY_API_KEY "$CLOUDINARY_API_KEY_VALUE"
-          check_required CLOUDINARY_API_SECRET "$CLOUDINARY_API_SECRET_VALUE"
-
-      - name: Prepare project directory
+          PRODUCTION_VARS: ${{ toJSON(vars) }}
+          PRODUCTION_SECRETS: ${{ toJSON(secrets) }}
         run: |
           set -eu
           mkdir -p "$PROJECT_DIR"
-
-      - name: Back up current deployment configuration
-        id: backup
-        run: |
-          set -eu
-          if [ -f "$PROJECT_DIR/.env" ]; then
+          rm -f "$PROJECT_DIR/.env.rollback" "$PROJECT_DIR/.env.compose.rollback" "$PROJECT_DIR/docker-compose.yml.rollback"
+          node scripts/generate-production-env.mjs "$RUNNER_TEMP/production.env"
+          docker network inspect bcn-infra >/dev/null
+          # Back up only deployments already on shared infrastructure.
+          # The legacy stack and its database volumes must remain available.
+          if [ -f "$PROJECT_DIR/docker-compose.yml" ] && [ -f "$PROJECT_DIR/.env" ] && \
+             [ -f "$PROJECT_DIR/.env.compose" ] && grep -q 'bcn-infra' "$PROJECT_DIR/docker-compose.yml"; then
             cp -p "$PROJECT_DIR/.env" "$PROJECT_DIR/.env.rollback"
-            echo "has_rollback=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "has_rollback=false" >> "$GITHUB_OUTPUT"
-          fi
-          if [ -f "$PROJECT_DIR/docker-compose.yml" ]; then
+            cp -p "$PROJECT_DIR/.env.compose" "$PROJECT_DIR/.env.compose.rollback"
             cp -p "$PROJECT_DIR/docker-compose.yml" "$PROJECT_DIR/docker-compose.yml.rollback"
-            echo "has_compose_rollback=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "has_compose_rollback=false" >> "$GITHUB_OUTPUT"
           fi
-
-      - name: Install production compose configuration
-        run: cp docker-compose.prod.yml "$PROJECT_DIR/docker-compose.yml"
-
-      - name: Generate production environment
-        env:
-          APP_PORT_VALUE: ${{ vars.APP_PORT }}
-          HOST_PORT_VALUE: ${{ vars.HOST_PORT }}
-          CORS_ORIGINS_VALUE: ${{ vars.CORS_ORIGINS }}
-          APP_URL_VALUE: ${{ vars.APP_URL || secrets.APP_URL }}
-          POSTGRES_USER_VALUE: ${{ vars.POSTGRES_USER }}
-          POSTGRES_DB_VALUE: ${{ vars.POSTGRES_DB }}
-          POSTGRES_PASSWORD_VALUE: ${{ secrets.POSTGRES_PASSWORD }}
-          DATABASE_URL_VALUE: ${{ secrets.DATABASE_URL }}
-          DB_POOL_MAX_VALUE: ${{ vars.DB_POOL_MAX || '10' }}
-          DB_POOL_MIN_VALUE: ${{ vars.DB_POOL_MIN || '1' }}
-          DB_POOL_IDLE_MS_VALUE: ${{ vars.DB_POOL_IDLE_MS || '300000' }}
-          DB_POOL_CONNECT_TIMEOUT_MS_VALUE: ${{ vars.DB_POOL_CONNECT_TIMEOUT_MS || '10000' }}
-          REDIS_URL_VALUE: ${{ secrets.REDIS_URL }}
-          REDIS_PASSWORD_VALUE: ${{ secrets.REDIS_PASSWORD }}
-          REDIS_KEY_PREFIX_VALUE: ${{ vars.REDIS_KEY_PREFIX || 'bcn:profiles:' }}
-          JWT_SECRET_VALUE: ${{ secrets.JWT_SECRET }}
-          JWT_REFRESH_SECRET_VALUE: ${{ secrets.JWT_REFRESH_SECRET }}
-          TOTP_ENCRYPTION_KEY_VALUE: ${{ secrets.TOTP_ENCRYPTION_KEY }}
-          RESEND_API_KEY_VALUE: ${{ secrets.RESEND_API_KEY }}
-          EMAIL_FROM_VALUE: ${{ vars.EMAIL_FROM }}
-          MAIL_QUEUE_CONCURRENCY_VALUE: ${{ vars.MAIL_QUEUE_CONCURRENCY || '5' }}
-          CLOUDINARY_CLOUD_NAME_VALUE: ${{ vars.CLOUDINARY_CLOUD_NAME }}
-          CLOUDINARY_API_KEY_VALUE: ${{ secrets.CLOUDINARY_API_KEY }}
-          CLOUDINARY_API_SECRET_VALUE: ${{ secrets.CLOUDINARY_API_SECRET }}
-          CLOUDINARY_IMAGE_FORMAT_VALUE: ${{ vars.CLOUDINARY_IMAGE_FORMAT || 'webp' }}
-          CLOUDINARY_IMAGE_QUALITY_VALUE: ${{ vars.CLOUDINARY_IMAGE_QUALITY }}
-          CLOUDINARY_AVATAR_FOLDER_VALUE: ${{ vars.CLOUDINARY_AVATAR_FOLDER || 'user-avatars' }}
-          CLOUDINARY_IMAGE_MAX_BYTES_VALUE: ${{ vars.CLOUDINARY_IMAGE_MAX_BYTES || '2097152' }}
-          USERS_LIST_CACHE_TTL_MS_VALUE: ${{ vars.USERS_LIST_CACHE_TTL_MS || '60000' }}
-          TIMELINE_CACHE_TTL_MS_VALUE: ${{ vars.TIMELINE_CACHE_TTL_MS || '60000' }}
-          LOG_LEVEL_VALUE: ${{ vars.LOG_LEVEL || 'info' }}
-          LOKI_ENABLED_VALUE: ${{ vars.LOKI_ENABLED || 'false' }}
-          LOKI_HOST_VALUE: ${{ vars.LOKI_HOST }}
-          LOKI_BASIC_AUTH_VALUE: ${{ secrets.LOKI_BASIC_AUTH }}
-          LOKI_BATCH_INTERVAL_SECONDS_VALUE: ${{ vars.LOKI_BATCH_INTERVAL_SECONDS || '5' }}
-          LOKI_TIMEOUT_MS_VALUE: ${{ vars.LOKI_TIMEOUT_MS || '10000' }}
-        run: |
-          set -eu
+          cp "$RUNNER_TEMP/production.env" "$PROJECT_DIR/.env"
+          cp "$RUNNER_TEMP/production.env.compose" "$PROJECT_DIR/.env.compose"
+          chmod 600 "$PROJECT_DIR/.env" "$PROJECT_DIR/.env.compose"
+          cp docker-compose.prod.yml "$PROJECT_DIR/docker-compose.yml"
           cd "$PROJECT_DIR"
-
-          write_env() {
-            printf '%s=%s\n' "$1" "$2"
-          }
-
-          {
-            write_env IMAGE_NAME "$IMAGE_NAME"
-            write_env IMAGE_TAG "$GITHUB_SHA"
-            write_env HOST_PORT "$HOST_PORT_VALUE"
-            write_env PORT "$APP_PORT_VALUE"
-            write_env SERVICE_NAME "$PROJECT_NAME"
-            write_env NODE_ENV production
-            write_env CORS_ORIGINS "$CORS_ORIGINS_VALUE"
-            write_env APP_URL "$APP_URL_VALUE"
-            write_env POSTGRES_USER "$POSTGRES_USER_VALUE"
-            write_env POSTGRES_DB "$POSTGRES_DB_VALUE"
-            write_env POSTGRES_PASSWORD "$POSTGRES_PASSWORD_VALUE"
-            write_env DATABASE_URL "$DATABASE_URL_VALUE"
-            write_env DB_POOL_MAX "$DB_POOL_MAX_VALUE"
-            write_env DB_POOL_MIN "$DB_POOL_MIN_VALUE"
-            write_env DB_POOL_IDLE_MS "$DB_POOL_IDLE_MS_VALUE"
-            write_env DB_POOL_CONNECT_TIMEOUT_MS "$DB_POOL_CONNECT_TIMEOUT_MS_VALUE"
-            write_env REDIS_URL "$REDIS_URL_VALUE"
-            write_env REDIS_PASSWORD "$REDIS_PASSWORD_VALUE"
-            write_env REDIS_KEY_PREFIX "$REDIS_KEY_PREFIX_VALUE"
-            write_env JWT_SECRET "$JWT_SECRET_VALUE"
-            write_env JWT_REFRESH_SECRET "$JWT_REFRESH_SECRET_VALUE"
-            write_env TOTP_ENCRYPTION_KEY "$TOTP_ENCRYPTION_KEY_VALUE"
-            write_env RESEND_API_KEY "$RESEND_API_KEY_VALUE"
-            write_env EMAIL_FROM "$EMAIL_FROM_VALUE"
-            write_env MAIL_QUEUE_CONCURRENCY "$MAIL_QUEUE_CONCURRENCY_VALUE"
-            write_env CLOUDINARY_CLOUD_NAME "$CLOUDINARY_CLOUD_NAME_VALUE"
-            write_env CLOUDINARY_API_KEY "$CLOUDINARY_API_KEY_VALUE"
-            write_env CLOUDINARY_API_SECRET "$CLOUDINARY_API_SECRET_VALUE"
-            write_env CLOUDINARY_IMAGE_FORMAT "$CLOUDINARY_IMAGE_FORMAT_VALUE"
-            write_env CLOUDINARY_IMAGE_QUALITY "$CLOUDINARY_IMAGE_QUALITY_VALUE"
-            write_env CLOUDINARY_AVATAR_FOLDER "$CLOUDINARY_AVATAR_FOLDER_VALUE"
-            write_env CLOUDINARY_IMAGE_MAX_BYTES "$CLOUDINARY_IMAGE_MAX_BYTES_VALUE"
-            write_env USERS_LIST_CACHE_TTL_MS "$USERS_LIST_CACHE_TTL_MS_VALUE"
-            write_env TIMELINE_CACHE_TTL_MS "$TIMELINE_CACHE_TTL_MS_VALUE"
-            write_env LOG_LEVEL "$LOG_LEVEL_VALUE"
-            write_env LOG_DIR logs
-            write_env LOG_FILE_ENABLED false
-            write_env LOKI_ENABLED "$LOKI_ENABLED_VALUE"
-            write_env LOKI_HOST "$LOKI_HOST_VALUE"
-            write_env LOKI_BASIC_AUTH "$LOKI_BASIC_AUTH_VALUE"
-            write_env LOKI_BATCH_INTERVAL_SECONDS "$LOKI_BATCH_INTERVAL_SECONDS_VALUE"
-            write_env LOKI_TIMEOUT_MS "$LOKI_TIMEOUT_MS_VALUE"
-            write_env APP_VERSION "$GITHUB_SHA"
-          } > .env
-
-          chmod 600 .env
-
-      - name: Validate compose configuration
-        run: |
-          set -eu
-          cd "$PROJECT_DIR"
-          docker compose config --quiet
+          docker compose --env-file .env.compose config --quiet
 
       - name: Pull image
         run: |
           set -eu
           cd "$PROJECT_DIR"
-          docker compose pull
+          docker compose --env-file .env.compose pull
+
+      - name: Run application database migration
+        run: |
+          set -eu
+          cd "$PROJECT_DIR"
+          docker compose --env-file .env.compose run --rm --no-deps --entrypoint npx app prisma migrate deploy
 
       - name: Deploy
         id: deploy
         run: |
           set -eu
           cd "$PROJECT_DIR"
-          docker compose up -d --remove-orphans
+          docker compose --env-file .env.compose up -d app
 
       - name: Health check
         id: health
@@ -290,41 +156,20 @@ jobs:
           docker logs "$PROJECT_NAME" --tail 100 || true
           exit 1
 
-      - name: Roll back failed deployment
-        if: ${{ failure() && steps.backup.outputs.has_rollback == 'true' }}
-        env:
-          HAS_COMPOSE_ROLLBACK: ${{ steps.backup.outputs.has_compose_rollback }}
+
+      - name: Restore previous shared-infrastructure application
+        if: ${{ failure() }}
         run: |
           set -eu
           cd "$PROJECT_DIR"
-          cp -p .env.rollback .env
-          if [ "$HAS_COMPOSE_ROLLBACK" = "true" ]; then
+          if [ -f .env.rollback ] && [ -f .env.compose.rollback ] && [ -f docker-compose.yml.rollback ]; then
+            cp -p .env.rollback .env
+            cp -p .env.compose.rollback .env.compose
             cp -p docker-compose.yml.rollback docker-compose.yml
+            docker compose --env-file .env.compose up -d app
+            docker compose --env-file .env.compose exec -T app node -e "fetch('http://127.0.0.1:' + process.env.APP_PORT + '/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
           fi
-          ROLLBACK_HOST_PORT=$(sed -n 's/^HOST_PORT=//p' .env | head -n 1)
-          case "$ROLLBACK_HOST_PORT" in
-            ''|*[!0-9]*)
-              echo "Rollback HOST_PORT is invalid"
-              exit 1
-              ;;
-          esac
-          docker compose pull
-          docker compose up -d --remove-orphans
-
-          for attempt in $(seq 1 30); do
-            if curl --fail --silent --show-error \
-              "http://127.0.0.1:${ROLLBACK_HOST_PORT}/health" >/dev/null; then
-              echo "Previous version restored successfully"
-              exit 0
-            fi
-            echo "Rollback health check attempt ${attempt}/30 failed"
-            sleep 2
-          done
-
-          echo "Rollback failed"
-          docker logs "$PROJECT_NAME" --tail 100 || true
-          exit 1
 
       - name: Remove rollback configuration after success
-        if: ${{ success() && steps.backup.outputs.has_rollback == 'true' }}
-        run: rm -f "$PROJECT_DIR/.env.rollback" "$PROJECT_DIR/docker-compose.yml.rollback"
+        if: ${{ success() }}
+        run: rm -f "$PROJECT_DIR/.env.rollback" "$PROJECT_DIR/.env.compose.rollback" "$PROJECT_DIR/docker-compose.yml.rollback"

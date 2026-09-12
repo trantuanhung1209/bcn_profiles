@@ -16,7 +16,7 @@ export class UpdateUserDto {
   @IsString({ message: 'Họ tên phải là chuỗi' })
   fullName?: string;
 
-  /** URL avatar. Gửi cùng avatarPublicId khi upload Cloudinary; gửi null để xóa. */
+  /** URL avatar. Gửi cùng avatarPublicId khi upload MinIO; gửi null để xóa. */
   @IsOptional()
   @ValidateIf((_, value) => value !== null)
   @IsUrl({ require_protocol: true }, { message: 'Avatar phải là URL hợp lệ' })

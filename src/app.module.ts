@@ -34,7 +34,9 @@ import { createWinstonLoggerOptions } from './common/logging/winston.config';
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
         const prefix =
-          config.get<string>('REDIS_KEY_PREFIX')?.trim() || 'bcn:profiles:';
+          config.get<string>('REDIS_PREFIX')?.trim() ||
+          config.get<string>('REDIS_KEY_PREFIX')?.trim() ||
+          'bcn:profiles:';
         const redis = createRedisClient(config, {
           keyPrefix: `${prefix}throttler:`,
           lazyConnect: false,
